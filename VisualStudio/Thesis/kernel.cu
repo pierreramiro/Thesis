@@ -21,14 +21,16 @@
 double beam_altitude_angles[n_beams]= {15.379,13.236,11.128,9.03,6.941,4.878,2.788,0.705,-1.454,-3.448,-5.518,-7.601,-9.697,-11.789,-13.914,-16.062};
 double beam_azimuth_angles[n_beams] = { -1.24, -1.2145, -1.1889, -1.1634, -1.1379, -1.1123, -1.0868, -1.0613, -1.0357, -1.0102, -0.98467, -0.95913, -0.9336, -0.90807, -0.88253, -0.857 };
 /*Cantidad puntos de la nube*/
-#define n_points_perDonut (n_AZBLK*n_beams)
+#define n_points_perDonut (unsigned int)(n_AZBLK*n_beams)
 /*Angulo entre azimuths*/
 #define angle_between_azimuths (-2*MPI/n_AZBLK)
 /*Ángulo de rotacion del motor*/
 #define rot_angle (-33.53706667 * MPI / 180)
+/*Creamos la matrix de rotación del eje del motor (eje Z)*/
+double rot_motor_matrix[9] ={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos(rot_angle) ,0,0,0,1 };
 /*Cantidad de Donuts en función del ángulo de rotación*/
-unsigned char n_donuts = (unsigned char)ceil(-MPI/rot_angle);
-#define n_total_points (n_points_perDonut*n_donuts)
+#define n_donuts (unsigned int)ceil(-MPI/rot_angle)
+#define n_total_points (unsigned int)(n_donuts*n_points_perDonut)
 /*----------------------------------------------------------------------------*/
 /**
  * Funciones de conversión
@@ -86,45 +88,92 @@ void rot_z_axis(double* XYZ_points, double angle) {
  */
 #define Radius_sphere 1.0
 void Generate_sphere(double* Point_Cloud) {
-    double x,y,z,R= Radius_sphere;
+    double R= Radius_sphere;
+    /*Generamos el azimuth refencial y los azimuts de cada sector*/
     for (int i = 0; i < n_beams; i++) {
-        /*ubicamos el punto del azimuth*/
-        /*x = r * cos(beam_altitude_angles[i] - mpi / 2);
-        y = 0;
-        z = r * sin(beam_altitude_angles[i] - mpi / 2);
+        /*ubicamos el punto del azimut referencial*/
+        Point_Cloud[3 * i + 0] = R* cos(beam_altitude_angles[i] - MPI / 2); //x
+        Point_Cloud[3 * i + 1] = 0;                                         //y
+        Point_Cloud[3 * i + 2] = R * sin(beam_altitude_angles[i] - MPI / 2);//z
+        /*Realizamos la rotacion del punto con respecto al eje x debido al desfase*/
+        rot_x_axis(&Point_Cloud[3*i],beam_azimuth_angles[i]);
+        /*Creamos los azimuts que inician en cada sector*/
+        /*mirror points from quarter Donut*/
+        Point_Cloud[(i + n_AZBLK / 4 * n_beams)*3+0] = Point_Cloud[3 * i + 0];
+        Point_Cloud[(i + n_AZBLK / 4 * n_beams)*3+1] = Point_Cloud[3 * i + 2];
+        Point_Cloud[(i + n_AZBLK / 4 * n_beams)*3+2] = -Point_Cloud[3 * i + 1];
+        /*mirror points from midle Donut*/
+        Point_Cloud[(i + n_AZBLK / 2 * n_beams)*3+0] = Point_Cloud[3 * i + 0];
+        Point_Cloud[(i + n_AZBLK / 2 * n_beams)*3+1] = -Point_Cloud[3 * i + 1];
+        Point_Cloud[(i + n_AZBLK / 2 * n_beams)*3+2] = -Point_Cloud[3 * i + 2];
+        /*mirror points from 3 quater Donut*/
+        Point_Cloud[(i + n_AZBLK * 3 / 4 * n_beams)*3 +0] = Point_Cloud[3 * i + 0];
+        Point_Cloud[(i + n_AZBLK * 3 / 4 * n_beams)*3 +1] = -Point_Cloud[3 * i + 2];
+        Point_Cloud[(i + n_AZBLK * 3 / 4 * n_beams)*3 +2] = Point_Cloud[3 * i + 1];
 
-
-
-
-        temp = rot_x_axis(beam_azimuth_angles[i]) * [x, y, z]';
-            point_cloud(j, 1) = temp(1);
-        point_cloud(j, 2) = temp(2);
-        point_cloud(j, 3) = temp(3);*/
     }
-
-
+    /*Definimos la matrix de rotación para los azimuth*/
+    double rot_matrix[9] = { 1,0,0,0,cos(angle_between_azimuths),-sin(angle_between_azimuths),0,sin(angle_between_azimuths),cos(angle_between_azimuths) };
+    /*Procedemos a realizar el barrido de cada sector para obtener la donnut referencial*/
+    double XYZ[3],temp[9];
+    for (int i = 1; i < n_AZBLK / 4; i++) {
+        for (int j = 0; j < n_beams;j++) {
+            /*Calculate previous point*/
+            XYZ[0] = Point_Cloud[((i - 1) * n_beams + j)*3 + 0];
+            XYZ[1] = Point_Cloud[((i - 1) * n_beams + j)*3 + 1];
+            XYZ[2] = Point_Cloud[((i - 1) * n_beams + j)*3 + 2];
+            /*rotate that point*/
+            mult_matrix (rot_matrix,3,3,XYZ,1,temp);
+            /*Set the new azimuth*/
+            Point_Cloud[(i * n_beams + j)*3 + 0] = temp[0];
+            Point_Cloud[(i * n_beams + j)*3 + 1] = temp[1];
+            Point_Cloud[(i * n_beams + j)*3 + 2] = temp[2];
+            /*mirror from quarter Donunt*/
+            Point_Cloud[((i + n_AZBLK / 4) * n_beams + j)*3 + 0] = temp[0];
+            Point_Cloud[((i + n_AZBLK / 4) * n_beams + j)*3 + 1] = temp[2];
+            Point_Cloud[((i + n_AZBLK / 4) * n_beams + j)*3 + 2] = -temp[1];
+            /*7mirror points from midle Donut*/
+            Point_Cloud[((i + n_AZBLK / 2) * n_beams + j)*3+0] = temp[0];
+            Point_Cloud[((i + n_AZBLK / 2) * n_beams + j)*3+1] = -temp[1];
+            Point_Cloud[((i + n_AZBLK / 2) * n_beams + j)*3+2] = -temp[2];
+            /*mirror points from midle Donut*/
+            Point_Cloud[((i + n_AZBLK * 3 / 4) * n_beams + j)*3 + 0] = temp[0];
+            Point_Cloud[((i + n_AZBLK * 3 / 4) * n_beams + j)*3 + 1] = -temp[2];
+            Point_Cloud[((i + n_AZBLK * 3 / 4) * n_beams + j)*3 + 2] = temp[1];
+        }
+    }
+    /*Rotamos la Donut referencial*/
+    for (unsigned int i = 1; i < n_donuts; i++) {
+        /*multiplicamos a todos los n_point_perdonut anteriores con la matriz de rotación*/
+        for (unsigned int j = 0; j < n_points_perDonut; j++) {
+            mult_matrix(rot_motor_matrix, 3, 3, &Point_Cloud[((i - 1) * n_points_perDonut + j) * 3], 1, temp);
+            Point_Cloud[(i * n_points_perDonut + j) * 3 + 0] = temp[0];
+            Point_Cloud[(i * n_points_perDonut + j) * 3 + 1] = temp[1];
+            Point_Cloud[(i * n_points_perDonut + j) * 3 + 2] = temp[2];
+;        }
+    }
 }
 /*----------------------------------------------------------------------------*/
 
 int main()
-{  
-    /** 
+{
+    /**
     * Nuestro sistema de referencia será : Eje Z será el eje de giro del motor.
     *                                      Eje X será el eje de la Donut referencial
     */
-    /*Creamos la matrix de rotación del eje del motor (eje Z)*/
-    double rot_matrix[9] = { cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos(rot_angle) ,0,0,0,1 };
     /*Allocate memory*/
     double* Point_Cloud;
-    Point_Cloud= (double*)malloc(n_total_points*sizeof(double));
+    Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
+    Generate_sphere(Point_Cloud);
+    /*Escribimos la data obtenida en un archivo csv*/
 
-
-
-
-
-
-
-
+    FILE* archivo;
+    archivo = fopen("Sphere_cloud.csv", "w+");
+    fprintf(archivo, "X, Y, Z\n");
+    for (unsigned int i=0; i < n_total_points; i++) {
+        fprintf(archivo,"%.4f, %.4f, %.4f\n", Point_Cloud[i*3+0], Point_Cloud[i * 3 + 1], Point_Cloud[i * 3 + 2]);
+    }
+    fclose(archivo);
 
 
 

@@ -1,5 +1,19 @@
 ﻿  Compiling CUDA source file kernel.cu...
   
   C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.5\bin\nvcc.exe" -gencode=arch=compute_52,code=\"sm_52,compute_52\" --use-local-env -ccbin "C:\Program Files (x86)\Microsoft Visual Studio\2019\Professional\VC\Tools\MSVC\14.29.30133\bin\HostX86\x64" -x cu   -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.5\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v11.5\include"  -G   --keep-dir x64\Debug  -maxrregcount=0  --machine 64 --compile -cudart static  -g  -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /Fdx64\Debug\vc142.pdb /FS /Zi /RTC1 /MDd " -o x64\Debug\kernel.cu.obj "C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu" 
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(80): warning #177-D: variable "x" was declared but never referenced
+  
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(80): warning #177-D: variable "y" was declared but never referenced
+  
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(80): warning #177-D: variable "z" was declared but never referenced
+  
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(80): warning #177-D: variable "R" was declared but never referenced
+  
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(107): warning #177-D: variable "rot_matrix" was declared but never referenced
+  
   kernel.cu
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(80): warning C4101: 'z': unreferenced local variable
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(80): warning C4101: 'y': unreferenced local variable
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(80): warning C4101: 'x': unreferenced local variable
+C:\Users\catolica\Documents\Github\Thesis\VisualStudio\Thesis\kernel.cu(107): warning C4101: 'rot_matrix': unreferenced local variable
   Thesis.vcxproj -> C:\Users\catolica\Documents\Github\Thesis\VisualStudio\x64\Debug\Thesis.exe

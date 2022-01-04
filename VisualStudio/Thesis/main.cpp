@@ -31,7 +31,7 @@ double beam_azimuth_angles[n_beams] = { -1.24*D180_MPI, -1.2145*D180_MPI, -1.188
 /*Creamos la matrix de rotación del eje del motor (eje Z)*/
 double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos(rot_angle) ,0,0,0,1 };
 /*Cantidad de Donuts en función del ángulo de rotación*/
-#define n_donuts (unsigned int)ceil(-MPI/rot_angle)
+#define n_donuts (unsigned int) ceil(-MPI/rot_angle)
 #define n_total_points (unsigned int)(n_donuts*n_points_perDonut)
 /*----------------------------------------------------------------------------*/
 /**
@@ -191,25 +191,32 @@ void Supress_redundant_data(double* Point_Cloud){
     //Set vertical limits
     double X_L1=Point_Cloud[0],X_Ln=Point_Cloud[15*3+0];
     //Array which contains lineś parameters
-    double L[5*(n_donuts-1)];
-    //Declare parameters from Donut-3 to Donut-n
-    for (int i = 2; i < n_donuts; i++)
+    double L[5*(n_donuts-2)];
+    //Declare parameters from Donut_1 to Donut_n-2
+    for (int i = 1; i < n_donuts-1; i++)
     {
+        //Hallamos dos puntos de la recta proyectada en el plano XY
         x1=Point_Cloud[i*n_points_perDonut*3+0];
         y1=Point_Cloud[i*n_points_perDonut*3+1];
         x=Point_Cloud[i*n_points_perDonut*3+n_beams*3+0];
         y=Point_Cloud[i*n_points_perDonut*3+n_beams*3+1];
+        //Calculamos la pendiente
         m=(y-y1)/(x-x1);
-        L[(i-2)*5+0]=x1;
-        L[(i-2)*5+1]=y1;
-        L[(i-2)*5+2]=Point_Cloud[i*n_points_perDonut*3+n_beams*3-3];//xn
-        L[(i-2)*5+3]=Point_Cloud[i*n_points_perDonut*3+n_beams*3-3+1];//xn
-        L[(i-2)*5+4]=m;
+        //Guardamos los valores de un punto de la recta del beam_0
+        L[(i-1)*5+0]=x1;
+        L[(i-1)*5+1]=y1;
+        //Guardamos los valores de un punto de la recta del beam_n
+        L[(i-1)*5+2]=Point_Cloud[i*n_points_perDonut*3+n_beams*3-3];//xn
+        L[(i-1)*5+3]=Point_Cloud[i*n_points_perDonut*3+n_beams*3-3+1];//yn
+        //Guardamos el valor de la pendiente hallada
+        L[(i-1)*5+4]=m;
     }
-    //Supress redundant data only for Donut 2
+    //Supress redundant data only for Donut 1
     int i=1;
     for (unsigned int j = 0; j < n_points_perDonut; j++){
+        //Calculamos si la coordenada del punto x
         x=Point_Cloud[i*n_points_perDonut*3+j*3];
+        //Analizamos si se encuentra en la zona de supresión
         if (X_Ln<=x&&x<=X_L1){
             Point_Cloud[i*n_points_perDonut*3+j*3]=0;
             Point_Cloud[i*n_points_perDonut*3+j*3+1]=0;
@@ -218,13 +225,14 @@ void Supress_redundant_data(double* Point_Cloud){
         }
     }
     //Supress redundant for the rest of the Donuts
+    //Creamos variable booleana para saber la zona del plano en donde se encuentra el punto
     bool left_side;
-    for (unsigned int i = 2; i < n_donuts; i++)
-    {
-        for (unsigned int j = 0; j < n_points_perDonut; j++)
-        {
+    for (unsigned int i = 2; i < n_donuts; i++){
+        for (unsigned int j = 0; j < n_points_perDonut; j++){
+            //Hallamos las coordenadas del punto a analizar
             x=Point_Cloud[i*n_points_perDonut*3+j*3];
             y=Point_Cloud[i*n_points_perDonut*3+j*3+1];
+            //Evaluamos si se encuentra en la zona referencial
             if (X_Ln<=x){
                 if(x<=X_L1){
                     Point_Cloud[i*n_points_perDonut*3+j*3]=0;
@@ -232,50 +240,99 @@ void Supress_redundant_data(double* Point_Cloud){
                     Point_Cloud[i*n_points_perDonut*3+j*3+2]=0;
                     continue;
                 }else{
+                    //Se encuentra del lado derecho
                     left_side=false;
                 }
             }else{
+                //Se encuentra del lazo izquierdo
                 left_side=true;
             }
-            y_temp=eq_line(L[(i-2)*5+4],x,L[(i-2)*5+3])
-            eq_line(x,L(i-1,1+left_side*2),L(i-1,2+left_side*2),);
-            y_temp=y_temp*(-1)^left_side;
-        }
-        
+            //Calculamos el valor de y_temp el cual limitará la zona
+            y_temp=eq_line(L[(i-2)*5+4],x,L[(i-2)*5+left_side*2],L[(i-2)*5+left_side*2+1]);
+            //Le colocamos un signo negativo, o no, para poder realizar un único condicional para ambos casos
+            y_temp=y_temp*(1-2*left_side);
+            y=y*(1-2*left_side);
+            //Evaluamos la condición de supresión
+            if (y>=y_temp){
+                //Eliminamos los puntos
+                Point_Cloud[i*n_points_perDonut*3+j*3]=0;
+                Point_Cloud[i*n_points_perDonut*3+j*3+1]=0;
+                Point_Cloud[i*n_points_perDonut*3+j*3+2]=0;
+                //points_deleted=points_deleted+1;
+            }
+        }   
     }
-    
-
-    for i=3:n_donuts
-   points_deleted=0;
-   for j=1:n_points
-        if X_Ln_beam <= x
-           if x<=X_L1
-               Point_Cloud((i-1)*n_points+j,:)=[0 0 0];
-               points_deleted=points_deleted+1;
-               continue;
-           else
-               left_side=boolean(0);
-           end
-       else
-           left_side=boolean(1);%Está a la zquierda
-       end
-       
-       y_temp=eq_line(x,L(i-1,1+left_side*2),L(i-1,2+left_side*2),L(i-1,5));
-       y_temp=y_temp*(-1)^left_side;
-       y=y*(-1)^left_side;
-       if y>=y_temp
-           Point_Cloud((i-1)*n_points+j,:)=[0 0 0];
-           points_deleted=points_deleted+1;
-       end
-   end 
-   Total_points_deleted=Total_points_deleted+points_deleted;
-   fprintf("\tSe eliminaron %d puntos de la Donut %d (%.2f%% eliminados)\n",points_deleted,i,points_deleted*100/n_points);
-end
-
-
 }
-
-
+/*----------------------------------------------------------------------------*/
+/**
+ * \brief One-Donut-Fill. Dado una nube de puntos sin traslape y siguiendo el 
+ * patrón de medición definido por el sistema Ouster-motor, se obtiene como 
+ * salida la malla triangular de las superficies que pertenecen a una única Donut.
+ * Primero se realiza la triangulación de la Donut referencial, luego en base a 
+ * esta triangulación se obtiene la de las demás Donuts, pero verificando si los
+ * vértices son distintos de cero
+ * 
+ * \param Point_Cloud es el puntero que tendrá los puntos de la nube de puntos  
+ * 
+ * \param T es el puntero donde se almacenará los vértices de los triángulos
+ * 
+ * \return None
+ */
+#define mask (n_points_perDonut-1)
+void One_Donut_Fill(double* Point_Cloud,unsigned int* T){
+    unsigned int v0,v1,v2;
+    //Definimos los vértices
+    //Realizamos la malla triangular para la Donut referencial
+    for (unsigned int j = 0; j < n_AZBLK; j++){
+        for (unsigned int k = 0; k < n_beams-1; k++)
+        {   
+            v0=j*n_beams+k;
+            v2=v0+1;
+            v1=(v0+n_beams+1)&mask;
+            T[j*(n_beams-1)*3*2+k*6]=v0;
+            T[j*(n_beams-1)*3*2+k*6+1]=v1;
+            T[j*(n_beams-1)*3*2+k*6+2]=v2;
+            v2=v1;
+            v1=v2-1;
+            T[j*(n_beams-1)*3*2+k*6+3]=v0;
+            T[j*(n_beams-1)*3*2+k*6+4]=v1;
+            T[j*(n_beams-1)*3*2+k*6+5]=v2;
+        }
+    }
+    double xp,yp,zp;
+    unsigned int temp_vex,count=0,n_triangles_perDonut=n_AZBLK*2*(n_beams-1);
+    for (unsigned int i = 1; i < n_donuts; i++){
+        for (unsigned int j = 0; j < n_triangles_perDonut; j++){
+            //Analizamos el punto del vertice v0
+            temp_vex=(T[j*3]+0+i*n_points_perDonut);
+            xp=Point_Cloud[temp_vex*3+0];
+            yp=Point_Cloud[temp_vex*3+1];
+            zp=Point_Cloud[temp_vex*3+2];
+            if ((xp!=0)||(yp!=0)||(zp!=0)){
+                //analizamos el punto del vertice v1
+                temp_vex=(T[j*3]+1+i*n_points_perDonut);
+                xp=Point_Cloud[temp_vex*3+0];
+                yp=Point_Cloud[temp_vex*3+1];
+                zp=Point_Cloud[temp_vex*3+2];
+                if ((xp!=0)||(yp!=0)||(zp!=0)){
+                    //analizamos el punto del vertice v2
+                    temp_vex=(T[j*3]+2+i*n_points_perDonut);
+                    xp=Point_Cloud[temp_vex*3+0];
+                    yp=Point_Cloud[temp_vex*3+1];
+                    zp=Point_Cloud[temp_vex*3+2];
+                    if ((xp!=0)||(yp!=0)||(zp!=0)){
+                        //Si todo lo anterior se cumple, guardamos el triángulo
+                        T[n_triangles_perDonut*3+count*3+2]=temp_vex;
+                        T[n_triangles_perDonut*3+count*3+1]=temp_vex-1;
+                        T[n_triangles_perDonut*3+count*3]=temp_vex-2;
+                        count++;
+                    }
+                }
+            }
+        }
+    }    
+}
+/*----------------------------------------------------------------------------*/
 int main()
 {
     /**
@@ -285,9 +342,12 @@ int main()
     /*Allocate memory*/
     double* Point_Cloud;
     Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
+    unsigned int* T_ODF;
+    T_ODF=(unsigned int*)malloc(n_AZBLK*2*(n_beams-1)*n_donuts*3*sizeof(unsigned int));
 
     Generate_sphere(Point_Cloud);
     Supress_redundant_data(Point_Cloud);
+    One_Donut_Fill(Point_Cloud,T_ODF);
     /*Escribimos la data obtenida en un archivo csv*/
 
     FILE* archivo;
@@ -298,6 +358,12 @@ int main()
     }
     fclose(archivo);
 
+    archivo = fopen("One_donut_fill.csv", "w+");
+    fprintf(archivo, "V1, V2, V3\n");
+    for (unsigned int i=0; i < n_AZBLK*2*(n_beams-1)*n_donuts; i++) {
+        fprintf(archivo,"%d, %d, %d\n", T_ODF[i*3+0], T_ODF[i * 3 + 1], T_ODF[i * 3 + 2]);
+    }
+    fclose(archivo);
 
 
     //------------------------------//

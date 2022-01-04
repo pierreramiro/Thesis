@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+VisualStudio/Thesis/One_donut_fill.csv
+VisualStudio/Thesis/Sphere_cloud.csv

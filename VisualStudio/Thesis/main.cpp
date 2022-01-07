@@ -33,6 +33,9 @@ double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos
 /*Cantidad de Donuts en función del ángulo de rotación*/
 #define n_donuts (unsigned int) ceil(-MPI/rot_angle)
 #define n_total_points (unsigned int)(n_donuts*n_points_perDonut)
+#define OneDonutFill_triangles          108226
+#define TwoandTriDonutFill_triangles    10036
+
 /*----------------------------------------------------------------------------*/
 /**
  * Funciones de conversión
@@ -299,39 +302,83 @@ void One_Donut_Fill(double* Point_Cloud,unsigned int* T){
             T[j*(n_beams-1)*3*2+k*6+5]=v2;
         }
     }
+    //En base a la malla referencial hallamos las demás superficies
     double xp,yp,zp;
     unsigned int temp_vex,count=0,n_triangles_perDonut=n_AZBLK*2*(n_beams-1);
     for (unsigned int i = 1; i < n_donuts; i++){
+        //Analizamos cada vertice del tríangulo
         for (unsigned int j = 0; j < n_triangles_perDonut; j++){
             //Analizamos el punto del vertice v0
-            temp_vex=(T[j*3]+0+i*n_points_perDonut);
+            temp_vex=(T[j*3]+i*n_points_perDonut);
             xp=Point_Cloud[temp_vex*3+0];
             yp=Point_Cloud[temp_vex*3+1];
             zp=Point_Cloud[temp_vex*3+2];
             if ((xp!=0)||(yp!=0)||(zp!=0)){
                 //analizamos el punto del vertice v1
-                temp_vex=(T[j*3]+1+i*n_points_perDonut);
+                temp_vex=(T[j*3+1]+i*n_points_perDonut);
                 xp=Point_Cloud[temp_vex*3+0];
                 yp=Point_Cloud[temp_vex*3+1];
                 zp=Point_Cloud[temp_vex*3+2];
                 if ((xp!=0)||(yp!=0)||(zp!=0)){
                     //analizamos el punto del vertice v2
-                    temp_vex=(T[j*3]+2+i*n_points_perDonut);
+                    temp_vex=(T[j*3+2]+i*n_points_perDonut);
                     xp=Point_Cloud[temp_vex*3+0];
                     yp=Point_Cloud[temp_vex*3+1];
                     zp=Point_Cloud[temp_vex*3+2];
                     if ((xp!=0)||(yp!=0)||(zp!=0)){
                         //Si todo lo anterior se cumple, guardamos el triángulo
                         T[n_triangles_perDonut*3+count*3+2]=temp_vex;
-                        T[n_triangles_perDonut*3+count*3+1]=temp_vex-1;
-                        T[n_triangles_perDonut*3+count*3]=temp_vex-2;
+                        T[n_triangles_perDonut*3+count*3+1]=(T[j*3+1]+i*n_points_perDonut);
+                        T[n_triangles_perDonut*3+count*3]=(T[j*3]+i*n_points_perDonut);
                         count++;
                     }
                 }
             }
         }
-    }    
+    }
+    printf("numero de triangulos: %d\n",count+n_triangles_perDonut);    
 }
+/*----------------------------------------------------------------------------*/
+/**
+ * \brief Two-and-Tri-Donut-Fill. Dado una nube de puntos sin traslape y siguiendo 
+ * el patrón de medición definido por el sistema Ouster-motor, se obtiene como 
+ * salida la malla triangular de las superficies que pertenecen a dos y tres Donut.
+ * Para realizar esto, debemos seguir una serie de pasos:
+ * 
+ * Primero, se debe hallar los triángulos pivots, pero para ello se deben hallar
+ * los triángulos de cada sector. Es por eso que primero establecemos unos valores
+ * de índice inicial el cual estarán ubicado en el "centro de la esfera, estos 
+ * valores de indice serán aumentados/reducidos para hallar el vértice no nulo que
+ * formará parte del triángulo pivot.
+ * 
+ * Luego,
+ * 
+ * \param Point_Cloud es el puntero que tendrá los puntos de la nube de puntos  
+ * 
+ * \param T es el puntero donde se almacenará los vértices de los triángulos
+ * 
+ * \return None
+ */
+void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* T){
+
+    unsigned int *last_Tripivots;
+    //A partir de la segunda Donut generamos las superficies
+    for (int i = 0; i < n_donuts; i++){
+        for (unsigned int sector = 0; sector < 4; sector++){
+            /*Creamos los tripivots*/
+            for (unsigned int j = 0; j < n_beams; j++){
+                //Establecemos el índice en el centro de la esfera para hallar el vertice
+                //límite que pertenece al tríangulo pivot
+                init_index=n_AZBLK/2*
+            }
+            
+        }
+        
+        
+    }
+    
+}
+
 /*----------------------------------------------------------------------------*/
 int main()
 {
@@ -342,12 +389,13 @@ int main()
     /*Allocate memory*/
     double* Point_Cloud;
     Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
-    unsigned int* T_ODF;
-    T_ODF=(unsigned int*)malloc(n_AZBLK*2*(n_beams-1)*n_donuts*3*sizeof(unsigned int));
-
+    unsigned int *T_ODF, *T_TTDF;
+    T_ODF=(unsigned int*)malloc(OneDonutFill_triangles*3*sizeof(unsigned int));
+    T_TTDF=(unsigned int*)malloc(TwoandTriDonutFill_triangles*3*sizeof(unsigned int));
     Generate_sphere(Point_Cloud);
     Supress_redundant_data(Point_Cloud);
     One_Donut_Fill(Point_Cloud,T_ODF);
+    TwoandTri_Donut_Fill(Point_Cloud,T_TTDF);
     /*Escribimos la data obtenida en un archivo csv*/
 
     FILE* archivo;

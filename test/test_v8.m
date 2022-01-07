@@ -23,7 +23,7 @@ Total_time_start=tic;
     ticks_between_azimuths=total_ticks/n_AZBLK;
     angle_between_azimuths=-2*pi/n_AZBLK;
 %Angle rotation,n° donuts,angular velocity,time per scan.
-    rot_angle=-26*pi/180;%33.53706667*pi/180;  %Rango operable [-135° ~ -15°]
+    rot_angle=-33.53706667*pi/180;  %Rango operable [-135° ~ -15°]
                                     %Ojo, notar que en -15 estamos por
                                     %debajo del beam_altitude_angle
     n_donuts=1;
@@ -258,13 +258,13 @@ T_Temp=[];
 count_temp=0;
 last_Tripivots=zeros(4,3);
 for i=2:n_donuts
-    %Define slot of fill
+    %Define sector of fill
     Tripivot_middle=[];
     Tripivot_middle_particular=[];
     %last_Tripivots=[];
-    for slot=1:4
-        %Transform slot to bits
-        bits_slot=de2bi(slot-1,2);
+    for sector=1:4
+        %Transform sector to bits
+        bits_sector=de2bi(sector-1,2);
         Tripivot=[];
         n_tripivot=0;
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -277,16 +277,16 @@ for i=2:n_donuts
         for j=1:n_beams
             %Found boundary points
             %init index será (n_points-n_beams)+j o (n_points/2-n_beams)+j
-            init_index=n_AZBLK/2*(2-xor(bits_slot(1),bits_slot(2)))-2;
+            init_index=n_AZBLK/2*(2-xor(bits_sector(1),bits_sector(2)))-2;
             init_index=bitand(init_index*n_beams+j-1,mask)+1;
             %^^^Note that is missing the offset of points (i-1)*n_points^^^
             %paso: sera el diferencial el cual sumará o restará al init_index
-            paso=n_beams*(-1)^bits_slot(1);
+            paso=n_beams*(-1)^bits_sector(1);
             v3=0;%considerar algun tipo de bandera para saber si se 
             %halló el v3 o no. Esto interesa para el caso de la Donut 6
             for count=1:n_AZBLK/4
                 %Entramos en bucle hasta encontrar los puntos límetes de
-                %cada Slot. En el condicional agregamos el offset para cada
+                %cada sector. En el condicional agregamos el offset para cada
                 %Donut correspondiente
                 eval_point=Point_Cloud(init_index+(i-1)*n_points,:);
                 if ~isequal(eval_point,[0 0 0])
@@ -299,26 +299,26 @@ for i=2:n_donuts
                 init_index=bitand(init_index+paso-1,mask)+1;
             end
             if v3==0
-                %fprintf("no consegui para "+i+"en slot "+slot+" y j igual a "+j +"\n");
+                %fprintf("no consegui para "+i+"en sector "+sector+" y j igual a "+j +"\n");
                 continue
             end
 %%%%--------%Hallamos el triángulo pivot
             point=Point_Cloud(v3,:);
             %Calculamos el azimuth que corresponde al alfa
-            %segun el slot, trabajamos con un cierto beam_elevate_angle
-            k_beam=(n_beams-1)*(1-bits_slot(2))+1;
+            %segun el sector, trabajamos con un cierto beam_elevate_angle
+            k_beam=(n_beams-1)*(1-bits_sector(2))+1;
             %realizamos la operación
-            [v1,v2]=get_tripivot(point,R,rot_matrix,slot,n_beams,n_AZBLK,i,...
+            [v1,v2]=get_tripivot(point,R,rot_matrix,sector,n_beams,n_AZBLK,i,...
             k_beam,beam_azimuth_angles(k_beam),angle_between_azimuths,mask);
-            if bits_slot(2)
-                %definimos el sentido horario Ya que para los slots 3 y 4
+            if bits_sector(2)
+                %definimos el sentido horario Ya que para los sectors 3 y 4
                 %El sentido de los vértices es distinto a los de los
-                %primeros slot. Entonces para seguir la jerarquía de los
+                %primeros sector. Entonces para seguir la jerarquía de los
                 %sentidos, cambiamos aqui
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%% Esto podría ser o o importante                        %
                 %%% Capaz, se puede definir un sentido para un lado y otro%
-                %%% para los otros slot ()slot3 y slot4)                  %
+                %%% para los otros sector ()sector3 y sector4)                  %
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 temp=v1;
                 v1=v2;
@@ -328,9 +328,9 @@ for i=2:n_donuts
             if isequal(Point_Cloud(v1,:),[0 0 0])
                 v_temp=v2;
                 point=Point_Cloud(v_temp,:);
-                [v1,v2]=get_tripivot(point,R,rot_matrix,slot,n_beams,n_AZBLK,i-1,...
+                [v1,v2]=get_tripivot(point,R,rot_matrix,sector,n_beams,n_AZBLK,i-1,...
                 k_beam,beam_azimuth_angles(k_beam),angle_between_azimuths,mask);
-                if bits_slot(2)
+                if bits_sector(2)
                     %Deseo el nuevo v1
                     v1=v2;
                 end
@@ -340,9 +340,9 @@ for i=2:n_donuts
             if isequal(Point_Cloud(v2,:),[0 0 0])
                 v_temp=v1;
                 point=Point_Cloud(v_temp,:);
-                [v1,v2]=get_tripivot(point,R,rot_matrix,slot,n_beams,n_AZBLK,i-1,...
+                [v1,v2]=get_tripivot(point,R,rot_matrix,sector,n_beams,n_AZBLK,i-1,...
                 k_beam,beam_azimuth_angles(k_beam),angle_between_azimuths,mask);
-                if bits_slot(2)
+                if bits_sector(2)
                     %Deseo el nuevo v2
                     v2=v1;
                 end
@@ -350,16 +350,16 @@ for i=2:n_donuts
                 Tripivot(n_tripivot,:)=[v1 v2 v3];
             end
             %debemos verificar que no exista concurrencia de Tripivots
-            if not(xor(bits_slot(1),bits_slot(2)))
-                %slot 1 y 4
-                if v2==last_Tripivots(slot,2)
-                   v2=last_Tripivots(slot,3);
+            if not(xor(bits_sector(1),bits_sector(2)))
+                %sector 1 y 4
+                if v2==last_Tripivots(sector,2)
+                   v2=last_Tripivots(sector,3);
                    Tripivot(n_tripivot,:)=[v1 v2 v3]; 
                 end
             else
-                %slot 2 y 3
-                if v1==last_Tripivots(slot,1)
-                   v1=last_Tripivots(slot,3);
+                %sector 2 y 3
+                if v1==last_Tripivots(sector,1)
+                   v1=last_Tripivots(sector,3);
                    Tripivot(n_tripivot,:)=[v1 v2 v3]; 
                 end
             end
@@ -367,16 +367,16 @@ for i=2:n_donuts
 %%%%%%Fin codígo tripivot
         TwoDonutFill=[TwoDonutFill;Tripivot];
         %Hallamos los triangulos que limitan la zona del medio
-        triangle_slot=Tripivot(1+(n_tripivot-1)*bits_slot(2),:);
-        Tripivot_middle=[Tripivot_middle;triangle_slot];
+        triangle_sector=Tripivot(1+(n_tripivot-1)*bits_sector(2),:);
+        Tripivot_middle=[Tripivot_middle;triangle_sector];
         if i==n_donuts &&length(Tripivot)>1
-            triangle_slot=Tripivot(1+(n_tripivot-1)*not(bits_slot(2)),:);
-            Tripivot_middle_particular=[Tripivot_middle_particular;triangle_slot];
+            triangle_sector=Tripivot(1+(n_tripivot-1)*not(bits_sector(2)),:);
+            Tripivot_middle_particular=[Tripivot_middle_particular;triangle_sector];
         end
         %--------------FIN TRIPIVOT--------------%
         %Con los triangulos pivot obtenidos, procedemos a realizar el
         %llenado de las zonas que encierran los triangulos. Hay dos tipos
-        %de zonas: los slot y los del medio
+        %de zonas: los sector y los del medio
         
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -392,15 +392,15 @@ for i=2:n_donuts
 %             end%esto ya no va
             %verificiamos que modo y tipo de zona será
             %analizamos el valor del punto siguiente
-            temp_point=Point_Cloud(v3_act+1+n_beams*bits_slot(1),:);
+            temp_point=Point_Cloud(v3_act+1+n_beams*bits_sector(1),:);
             if isequal(temp_point,[0 0 0])
                 %No existe punto
-                escalera=bits_slot(1);
+                escalera=bits_sector(1);
             else
                 %si existe punto
-                escalera=not(bits_slot(1));
+                escalera=not(bits_sector(1));
             end
-            tipo= not(xor(bits_slot(1),escalera));
+            tipo= not(xor(bits_sector(1),escalera));
             %Luego de definir el modo y el tipo. Podemos definir el pasoL1
             %para llegar al v3_next
             pasoL1=n_beams*(-1)^xor(escalera,tipo);
@@ -410,11 +410,11 @@ for i=2:n_donuts
             %v3_next=Tripivot(j+1,3);            
             %definimos los límites
             v_init=Tripivot(j+tipo,2-escalera);
-            %v_init=Tripivot(j+tipo, 1+xor(bits_slot(1),tipo) );
+            %v_init=Tripivot(j+tipo, 1+xor(bits_sector(1),tipo) );
             v_fin=Tripivot(j+not(tipo),2-not(escalera));
-            %v_fin=Tripivot(j+not(tipo),2-xor(bits_slot(1),tipo) );
+            %v_fin=Tripivot(j+not(tipo),2-xor(bits_sector(1),tipo) );
             v_corner_fin=Tripivot(j+not(tipo),3);
-            pasoL2=(-1)^xor(bits_slot(2),tipo)*pasoL1;
+            pasoL2=(-1)^xor(bits_sector(2),tipo)*pasoL1;
             %Para verificar si es de doble o tri llenado, se resta n_points
             %ya que si fuera TriDonutFill, una de las Donuts invoolucradas
             %seria la referencial. De esta forma obtenemos un signo negativo
@@ -436,11 +436,11 @@ for i=2:n_donuts
                 %Definimos un nuevo triángulo, que será el del medio
                 %primero tenemos que partir de un vertice para hallar al
                 %v3_mid. Este vertice de partida será siempre del T_actual
-                %para los slot 1 y 2 y para los slot3y4 será el T_next
+                %para los sector 1 y 2 y para los sector3y4 será el T_next
                 %notar que se está hallando el tripivot de la Donut
                 %anterior (i-1)!!!!
-                v3_mid=Tripivot(j+bits_slot(2),1);%es indiferente si es el vertice 1 o 2
-                paso_mid=pasoL2*(-1)^xor(tipo,bits_slot(2));
+                v3_mid=Tripivot(j+bits_sector(2),1);%es indiferente si es el vertice 1 o 2
+                paso_mid=pasoL2*(-1)^xor(tipo,bits_sector(2));
                 %no hace falta hacer mask ya que siempre es con la Donut
                 %anterior y los Trifill ocurren a partir de la donut 2, es
                 %decir i>=3
@@ -454,20 +454,20 @@ for i=2:n_donuts
                 %Hallamos el triangulo pivot Repetimos e código de líneas
                 %arriba
                 %------------------TRIPIVOT MIDDLE----------------%
-                k_beam=(n_beams-1)*(1-bits_slot(2))+1;
+                k_beam=(n_beams-1)*(1-bits_sector(2))+1;
                 %realizamos la operación
                 point=Point_Cloud(v3_mid,:);
-                [v1_mid,v2_mid]=get_tripivot(point,R,rot_matrix,slot,n_beams,n_AZBLK,i-1,...
+                [v1_mid,v2_mid]=get_tripivot(point,R,rot_matrix,sector,n_beams,n_AZBLK,i-1,...
                 k_beam,beam_azimuth_angles(k_beam),angle_between_azimuths,mask);
-                if bits_slot(2)
-                    %definimos el sentido horario Ya que para los slots 3 y 4
+                if bits_sector(2)
+                    %definimos el sentido horario Ya que para los sectors 3 y 4
                     %El sentido de los vértices es distinto a los de los
-                    %primeros slot. Entonces para seguir la jerarquía de los
+                    %primeros sector. Entonces para seguir la jerarquía de los
                     %sentidos, cambiamos aqui
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                     %%% Esto podría ser o o importante                        %
                     %%% Capaz, se puede definir un sentido para un lado y otro%
-                    %%% para los otros slot ()slot3 y slot4)                  %
+                    %%% para los otros sector ()sector3 y sector4)                  %
                     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                     temp=v1_mid;
                     v1_mid=v2_mid;
@@ -477,8 +477,8 @@ for i=2:n_donuts
                 %------------Fin TRIPIVOT MIDDLE-------------%
                 %----------Primer llenado----------%
                 %Definimos los v_lim Para hacer el primer llenado
-                a=bits_slot(2);
-                b=bits_slot(1);
+                a=bits_sector(2);
+                b=bits_sector(1);
                 c=escalera;
                 %v_lim1 será el vertice limite para el v_corner
                 v_lim1=Tripivot(j+not(tipo),3);
@@ -495,8 +495,8 @@ for i=2:n_donuts
                 TriDonutFill=[TriDonutFill;temp];
                 %----------Fin Primer llenado----------%
                 %----------Segundo llenado----------%
-                index=double(xor(bits_slot(2),xor(bits_slot(1),escalera)));
-                index=3-index-double(escalera&&not(xor(bits_slot(1),bits_slot(2))));
+                index=double(xor(bits_sector(2),xor(bits_sector(1),escalera)));
+                index=3-index-double(escalera&&not(xor(bits_sector(1),bits_sector(2))));
                 %Definimos el nuevo v_init
                 new_v_init=T_mid(index);
                 %Creamos el triangulo de transicion
@@ -511,20 +511,20 @@ for i=2:n_donuts
                 %display(freepoints_mid)
             end
         end   
-        %--------------------FIN FILL SLOTS---------------------%
+        %--------------------FIN FILL sectorS---------------------%
         %la siguiente variable guardará los tripivots pasados para
         %verificar que no exista concurrencia de tripivots con la siguiente
         %Donut
         if i~=n_donuts
             %hacemos este condicional ya que para la última Donut no
             %necesitamos realizar esto
-            last_Tripivots(slot,:)=Tripivot(1+double(not(bits_slot(2)))*j,:);
+            last_Tripivots(sector,:)=Tripivot(1+double(not(bits_sector(2)))*j,:);
         end
     end
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%%%%%%%%           MIDDLE FILL         %%%%%%%%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %SLOT1 con SLOT2
+    %sector1 con sector2
     vleft_init=Tripivot_middle(1,3);
     vrigth_init=Tripivot_middle(1,2);
     vleft_fin=Tripivot_middle(2,3);
@@ -533,7 +533,7 @@ for i=2:n_donuts
     pasoRigth=pasoLeft;
     temp=sidetosideFill_v3(vleft_init,vrigth_init,vleft_fin,vrigth_fin,pasoLeft,pasoRigth,n_points);
     TriMiddleFill=[TriMiddleFill;temp];
-    %SLOT3 con SLOT4
+    %sector3 con sector4
     vleft_init=Tripivot_middle(4,3);
     vrigth_init=Tripivot_middle(4,2);
     vleft_fin=Tripivot_middle(3,3);

@@ -33,6 +33,7 @@ double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos
 /*Cantidad de Donuts en función del ángulo de rotación*/
 #define n_donuts (unsigned int) ceil(-MPI/rot_angle)
 #define n_total_points (unsigned int)(n_donuts*n_points_perDonut)
+/*Cantidad de triángulos*/
 #define OneDonutFill_triangles          108226
 #define TwoandTriDonutFill_triangles    10036
 
@@ -174,7 +175,6 @@ double eq_line(double m,double x,double xb,double yb) {
     double y= m*(x-xb)+yb;
     return y;
 }
-
 /*----------------------------------------------------------------------------*/
 /**
  * \brief Supress redundant data. En esta función se realiza la supresión de los 
@@ -340,6 +340,96 @@ void One_Donut_Fill(double* Point_Cloud,unsigned int* T){
 }
 /*----------------------------------------------------------------------------*/
 /**
+ * \brief get_tripivot. Dado el punto del vértice de la Donut, se hallan los otros
+ * vértices del triángulo pívot. 
+ * 
+ * \param v0_pointer.  puntero del vértice v0
+ * 
+ * \param v1_pointer. puntero del vértice v1
+ * 
+ * \param point. Puntero que contiene las coordenadas del vertice v2 del tripivot
+ * 
+ * \param sector. Indica en que sector estamos de la Donut
+ * 
+ * \param i. Indica para que Donut se está hallando el tripivot
+ * 
+ * \param k_beam. Nos dice si nos enfocamos con el beam=0 o el beam=15
+ * 
+ * \return None
+ */
+void get_tripivot(unsigned int *v0_pointer,unsigned int *v1_pointer,double *point,unsigned int sector,unsigned int i,unsigned int k_beam){
+    //Definimos las variables
+    unsigned int offset,k_azimuth,v0_temp,v1_temp,v_temp;
+    double y_data,z_data,theta,rot_theta,alfa;
+    double *rot_point;
+    //Se debe tener en cuenta los rango de acos y asin
+    //  acos: [0~pi]
+    //  atan: [-pi/2~pi/2]
+    rot_point[0]=point[0];
+    rot_point[1]=point[1];
+    rot_point[2]=point[2];
+    //Con el valor de x_data, podemos hallar el ángulo del punto con respecto a 
+    //la Donut referencial, teniendo como eje de giro el eje z
+    theta=-acos(point[0]/Radius_sphere);
+    //Asimismo, debemos hallar el ángulo con respecto al al Donut previa, para ello
+    //realizamos un antigiro para que la Donut previa "aparente" ser la referencial y
+    //usar las funciones ya establecidas
+    rot_z_axis(rot_point, -rot_angle*(i-1));
+    rot_theta=-acos(rot_point[1]/Radius_sphere);
+    if (theta*(1-2*((sector>>1)&0x1)) >= rot_theta*(1-2*((sector>>1)&0x1)))
+    {
+        //Los vértices pertenecen a la Donut referencias
+        y_data=point[1];
+        z_data=point[2];
+        offset=0;
+    }else{
+        //los vértices pertenecerán a la previa Donut
+        y_data=rot_point[1];
+        z_data=rot_point[2];
+        theta=rot_theta;
+        offset=n_AZBLK*n_beams*(i-1);
+    }
+    //Hallamos el ángulo alfa, que es el angulo del azimuth
+    alfa=-MPI_2 +atan(z_data/y_data);
+    if (y_data>0) alfa=-MPI+alfa;
+    //Añadimos -2pi al alfa para no tener probelmas con el bitwise and,
+    //esto al final no perjudica ya que se hace el masking de bits
+    //solo que tener en cuenta que la división entre -2pi/ang_bet_azit
+    //da un total de 1024.
+    alfa=alfa-2*pi;
+    //Con lo anterior, nos hemos asegurado que el alfa sea siempre negativo
+    //Calculamos el azimuth que corresponde al alfa
+    k_azimuth=(unsigned int)((alfa-beam_azimuth_angles[k_beam])/angle_between_azimuths);
+    v0_temp=(k_azimuth)*n_beams+k_beam;
+    //Enmascaramos
+    v0_temp=v0_temp&mask;
+    v1_temp=(v0_temp+n_beams)&mask;
+    //Realizamos offset y sentido
+    v0_temp+=offset;
+    v1_temp+=offset;
+    /*Debemos establecer el orden de los vértices, es decir horario o antihorario*/
+    //Esto depende del sector
+    if ((sector>>1)&0x1){
+        //definimos el sentido horario Ya que para los sectors 3 y 4
+        //El sentido de los vértices es distinto a los de los
+        //primeros sector. Entonces para seguir la jerarquía de los
+        //sentidos, cambiamos aqui
+        //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        //%%% Esto podría ser o o importante                        %
+        //%%% Capaz, se puede definir un sentido para un lado y otro%
+        //%%% para los otros sector ()sector3 y sector4)            %
+        //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        v_temp=v0_temp;
+        v0_temp=v1_temp;
+        v1_temp=v_temp;
+    }
+    *v0_pointer=v0_temp;
+    *v1_pointer=v1_temp;
+                
+}
+
+/*----------------------------------------------------------------------------*/
+/**
  * \brief Two-and-Tri-Donut-Fill. Dado una nube de puntos sin traslape y siguiendo 
  * el patrón de medición definido por el sistema Ouster-motor, se obtiene como 
  * salida la malla triangular de las superficies que pertenecen a dos y tres Donut.
@@ -359,17 +449,68 @@ void One_Donut_Fill(double* Point_Cloud,unsigned int* T){
  * 
  * \return None
  */
+#define NO_VEX_FOUND -1 
 void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* T){
-
+    int paso;
+    unsigned int n_tripivot,init_index,v0,v1,v2,k_beam;
+    double x_point,y_point,z_point;
     unsigned int *last_Tripivots;
+    bool vex_found;
     //A partir de la segunda Donut generamos las superficies
     for (int i = 0; i < n_donuts; i++){
         for (unsigned int sector = 0; sector < 4; sector++){
+            n_tripivot=0;
             /*Creamos los tripivots*/
             for (unsigned int j = 0; j < n_beams; j++){
-                //Establecemos el índice en el centro de la esfera para hallar el vertice
-                //límite que pertenece al tríangulo pivot
-                init_index=n_AZBLK/2*
+                //Debemos hallar el vertice límite distinto de cero, para ello usamos un 
+                //init_index que nos permitirá evaluar cada punto hasta hallar el que es 
+                //distinto de cero. Para hacer esto, el init_index debe iniciar en la parte
+                //inferior o superior de la esfera, es decir, donde los puntos son igual a 
+                //cero. init_index será (n_points-n_beams)+j o (n_points/2-n_beams)+j, luego
+                //se le añade el offset correspondiente a cada Donut.
+                //Segun el sector, podemos definir si debería iniciar en la parte superior o
+                //inferior:
+                init_index=(n_AZBLK>>1)*(2-(((sector>>1)&0x1)^(sector&0x1)))-1;
+                init_index=init_index*n_beams+j;
+                //Definimos si el paso será positivo o negativo, esto dependerá del sector.
+                paso=n_beams*(1-2*(sector&0x1));
+                //Creamos bandera para saber si se halló un vértice para crear el tripivot
+                vex_found=false;
+                for (unsigned int count = 0; count < n_AZBLK; count++){
+                    //Entramos en un bucle donde evaluamos los puntos de la Donut hasta hallar
+                    //el punto que sea distinto de cero
+                    x_point=Point_Cloud[i*n_points_perDonut*3+init_index*3+0];  
+                    y_point=Point_Cloud[i*n_points_perDonut*3+init_index*3+1];
+                    z_point=Point_Cloud[i*n_points_perDonut*3+init_index*3+2];
+                    //Evaluamos condición
+                    if ((x_point!=0)||(y_point!=0)||(z_point!=0)){
+                        //Hallamos vertice distinto de cero
+                        vex_found=true;
+                        //Agregamos el offset de la Donut correspondiente
+                        v2=init_index+i*n_points_perDonut;
+                        //Realizamos un conteo de los tripivot
+                        n_tripivot++;
+                        break;
+                    }
+                    //Realizamos el paso correspondiente a init_index
+                    init_index=(init_index+paso)&mask;
+                }
+                //Evaluamos el caso que no se consiguió el vértice
+                if (!vex_found){
+                    //Evaluamos para los siguientes beams
+                    continue
+                }
+                /*Procedemos a hallar los demás vértices del tripivot*/
+                //Dependiendo del sector estamos más cerca del beam=0 o el beam=15
+                k_beam=(n_beams-1)*(1-(sector>>1)&0x1);
+                ///Hallamos los otros vértices
+                get_tripivot(&v0,&v1,&Point_Cloud[v2],sector,i,k_beam);
+                //continuamos aqui:
+
+
+
+
+                
             }
             
         }

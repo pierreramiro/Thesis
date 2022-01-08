@@ -2,12 +2,12 @@ function [vmin,vmax]=get_tripivot(point,R,rot_matrix,slot,n_beams,n_AZBLK,i,k_be
     %Se debe tener en cuenta los rango de acos y asin
     %acos: [0~pi]
     %atan: [-pi/2~pi/2]
-    bits_slot=de2bi(slot-1,2);
+    bits_sector=de2bi(slot-1,2);
     x_data=point(1);
     thetha=-acos(x_data/R);
     rot_point=rot_matrix^-(i-2)*point';
     rot_thetha=-acos(rot_point(1)/R);
-    if thetha*(-1)^bits_slot(2)>=rot_thetha*(-1)^bits_slot(2)
+    if thetha*(-1)^bits_sector(2)>=rot_thetha*(-1)^bits_sector(2)
         %los vértices pertenecerán a la Donut referencial
         y_data=point(2);
         z_data=point(3);
@@ -60,7 +60,7 @@ end
 %             thetha=-acos(x_data/R);
 %             rot_point=rot_matrix^-(i-2)*point';
 %             rot_thetha=-acos(rot_point(1)/R);
-%             if thetha*(-1)^bits_slot(2)>=rot_thetha*(-1)^bits_slot(2)
+%             if thetha*(-1)^bits_sector(2)>=rot_thetha*(-1)^bits_sector(2)
 %                 %los vértices pertenecerán a la Donut referencial
 %                 y_data=point(2);
 %                 z_data=point(3);
@@ -85,7 +85,7 @@ end
 %             %nos hemos asegurado que el alfa sea siempre negativo
 %             %Calculamos el azimuth que corresponde al alfa
 %             %segun el slot, trabajamos con un cierto beam_elevate_angle
-%             k_beam=15*(1-bits_slot(2))+1;
+%             k_beam=15*(1-bits_sector(2))+1;
 %             %realizamos la operación
 %             k_azimuth=floor((alfa-beam_azimuth_angles(k_beam))/angle_between_azimuths);
 %             v1=(k_azimuth)*n_beams+k_beam;
@@ -94,7 +94,7 @@ end
 %             %Realizamos offset y sentido
 %             v1=v1+offset;
 %             v2=v2+offset;
-%             if bits_slot(2)
+%             if bits_sector(2)
 %                 %definimos el sentido horario Ya que para los slots 3 y 4
 %                 %El sentido de los vértices es distinto a los de los
 %                 %primeros slot. Entonces para seguir la jerarquía de los

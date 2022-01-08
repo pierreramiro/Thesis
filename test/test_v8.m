@@ -324,7 +324,7 @@ for i=2:n_donuts
                 v1=v2;
                 v2=temp;
             end
-            Tripivot(n_tripivot,:)=[v1 v2 v3];
+            %Tripivot(n_tripivot,:)=[v1 v2 v3];
             if isequal(Point_Cloud(v1,:),[0 0 0])
                 v_temp=v2;
                 point=Point_Cloud(v_temp,:);
@@ -335,7 +335,7 @@ for i=2:n_donuts
                     v1=v2;
                 end
                 v2=v_temp;
-                Tripivot(n_tripivot,:)=[v1 v2 v3];
+                %Tripivot(n_tripivot,:)=[v1 v2 v3];
             end
             if isequal(Point_Cloud(v2,:),[0 0 0])
                 v_temp=v1;
@@ -347,29 +347,30 @@ for i=2:n_donuts
                     v2=v1;
                 end
                 v1=v_temp;
-                Tripivot(n_tripivot,:)=[v1 v2 v3];
+                %Tripivot(n_tripivot,:)=[v1 v2 v3];
             end
             %debemos verificar que no exista concurrencia de Tripivots
             if not(xor(bits_sector(1),bits_sector(2)))
                 %sector 1 y 4
                 if v2==last_Tripivots(sector,2)
                    v2=last_Tripivots(sector,3);
-                   Tripivot(n_tripivot,:)=[v1 v2 v3]; 
+                   %Tripivot(n_tripivot,:)=[v1 v2 v3]; 
                 end
             else
                 %sector 2 y 3
                 if v1==last_Tripivots(sector,1)
                    v1=last_Tripivots(sector,3);
-                   Tripivot(n_tripivot,:)=[v1 v2 v3]; 
+                   %Tripivot(n_tripivot,:)=[v1 v2 v3]; 
                 end
             end
+            Tripivot(n_tripivot,:)=[v1 v2 v3];
         end
 %%%%%%Fin codígo tripivot
         TwoDonutFill=[TwoDonutFill;Tripivot];
         %Hallamos los triangulos que limitan la zona del medio
         triangle_sector=Tripivot(1+(n_tripivot-1)*bits_sector(2),:);
         Tripivot_middle=[Tripivot_middle;triangle_sector];
-        if i==n_donuts &&length(Tripivot)>1
+        if i==n_donuts &&length(Tripivot)>1 
             triangle_sector=Tripivot(1+(n_tripivot-1)*not(bits_sector(2)),:);
             Tripivot_middle_particular=[Tripivot_middle_particular;triangle_sector];
         end
@@ -415,10 +416,16 @@ for i=2:n_donuts
             %v_fin=Tripivot(j+not(tipo),2-xor(bits_sector(1),tipo) );
             v_corner_fin=Tripivot(j+not(tipo),3);
             pasoL2=(-1)^xor(bits_sector(2),tipo)*pasoL1;
-            %Para verificar si es de doble o tri llenado, se resta n_points
-            %ya que si fuera TriDonutFill, una de las Donuts invoolucradas
-            %seria la referencial. De esta forma obtenemos un signo negativo
-            if (v_init-n_points)*(v_fin-n_points)>=0 
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%-----DEPRECATED-----%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %------>>Para verificar si es de doble o tri llenado, se resta n_points
+            %------>>ya que si fuera TriDonutFill, una de las Donuts invoolucradas
+            %------>>seria la referencial. De esta forma obtenemos un signo negativo
+            %------>>if (v_init-n_points)*(v_fin-n_points)>=0 
+            %%%%%%%%%%%%%%%%%%%%^^^^^^^-----DEPRECATED-----^^^^%%%%%%%%%%%%%%%%%%%%%%%
+            %Se cambió la condición anterior con esta nueva que evalua los bits MSB en vez de usar valores negativos
+            condicionUno=isequal(bitand(uint32(v_init),bitcmp(uint32(mask))),bitand(uint32(v_fin),bitcmp(uint32(mask))));
+            condicionDos=~isequal(bitand(uint32(v_init),bitcmp(uint32(mask))),0)&&~isequal(bitand(uint32(v_fin),bitcmp(uint32(mask))),0);
+            if condicionUno||condicionDos
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
                 %%%%%%%  TWO-DONUT FILL %%%%%%%
                 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

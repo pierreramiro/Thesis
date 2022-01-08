@@ -3,6 +3,7 @@ function T=sidetosideFill_v3(vL1_init,vL2_init,vL1_fin,vL2_fin,pasoL1,pasoL2,n_p
     %Realizamos algunos ajustes para poderr obterner el valor magnitud de
     %los puntos libres tanto para la izquierda y derecha
     if pasoL1<0
+        %...Me parece que hay que restar y volver a sumar una unidad....
         vmax=bitand(vL1_init,mask);
         vmin=bitand(vL1_fin,mask);
     else

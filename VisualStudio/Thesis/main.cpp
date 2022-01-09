@@ -36,9 +36,9 @@ double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos
 /*Cantidad de triángulos*/
 #define OneDonutFill_triangles          108226
 #define TwoDonutFill_triangles          6883
-#define TriDonutFill_triangles          6883
-#define MidDonutFill_triangles          6883
-
+#define TriDonutFill_triangles          360
+#define MidDonutFill_triangles          2793
+#define n_total_triangles (OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles+MidDonutFill_triangles)
 /*----------------------------------------------------------------------------*/
 /**
  * Funciones de conversión
@@ -556,6 +556,13 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
     int pasoL0,pasoL1;
     //Variables para operar con los vértices
     unsigned int v0,v1,v2,v_temp,v_corner,v_corner_fin,v_init,v_fin;
+    //Variables para operar con los vertices en el TriDonutFill
+    unsigned int v0_mid,v1_mid,v2_mid,T_mid[3],v0_lim,v1_lim,v2_lim,index,new_v_init;
+    int paso_mid,freepoints_mid;
+    unsigned int a,b,c,d;
+    //Variables para el middlefill
+    unsigned int vrigth_init,vrigth_fin,vleft_init,vleft_fin;
+    int pasoRigth,pasoLeft;
     //A partir de la segunda Donut generamos las superficies
     for (int i = 1; i < n_donuts; i++){
         for (unsigned int sector = 0; sector < 4; sector++){
@@ -602,7 +609,7 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
                 }
                 /*Procedemos a hallar los demás vértices del tripivot*/
                 //Dependiendo del sector estamos más cerca del beam=0 o el beam=15
-                k_beam=(n_beams-1)*(1-(sector>>1)&0x1);
+                k_beam=(n_beams-1)*(1.0-((sector>>1)&0x1));
                 ///Hallamos los otros vértices
                 get_tripivot(&v0,&v1,&Point_Cloud[v2*3],sector,i,k_beam);
                 /*Debemos establecer el orden de los vértices, es decir horario o antihorario*/
@@ -628,7 +635,7 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
                 z_point=Point_Cloud[v0*3+2];
                 if ((x_point==0)&&(y_point==0)&&(z_point==0)){
                     //Guardamos el valor de v1.//v_temp=v1;
-                    get_tripivot(&v0,&v_temp,&Point_Cloud[v1*3],sector,i,k_beam);
+                    get_tripivot(&v0,&v_temp,&Point_Cloud[v1*3],sector,i-1,k_beam);
                     if ((sector>>1)&0x1){
                         //Deseo el nuevo v0
                         v0=v_temp;
@@ -640,7 +647,7 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
                 y_point=Point_Cloud[v1*3+1];
                 z_point=Point_Cloud[v1*3+2];
                 if ((x_point==0)&&(y_point==0)&&(z_point==0)){
-                    get_tripivot(&v_temp,&v1,&Point_Cloud[v0*3],sector,i,k_beam);
+                    get_tripivot(&v_temp,&v1,&Point_Cloud[v0*3],sector,i-1,k_beam);
                     if ((sector>>1)&0x1){
                         //Deseo el nuevo v1
                         v1=v_temp;
@@ -676,7 +683,7 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
             Tripivot_middle[sector*3+0]=Tripivot[((n_tripivot-1)*(sector>>1))*3+0];
             Tripivot_middle[sector*3+1]=Tripivot[((n_tripivot-1)*(sector>>1))*3+1];
             Tripivot_middle[sector*3+2]=Tripivot[((n_tripivot-1)*(sector>>1))*3+2];
-            if ((i==(n_donuts-1))&&(n_tripivot>0)){
+            if ((i==(n_donuts-1))&&(n_tripivot>1)){
                 //Este caso ocurre en la última Donut, también hallar los 4 triangulos
                 Tripivot_middle_particular[sector*3+0]=Tripivot[((n_tripivot-1)*(0x1^(sector>>1)))*3+0];
                 Tripivot_middle_particular[sector*3+1]=Tripivot[((n_tripivot-1)*(0x1^(sector>>1)))*3+1];
@@ -748,7 +755,87 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
                     side2sideFill(v_corner,v_init,v_corner_fin,v_fin,pasoL0,pasoL1,TwoDF,&n_Twotriangles);
                 }else{
                     /* TriDonutFill*/
-                    
+                    //Definimos un nuevo triángulo, que será el del medio
+                    //primero tenemos que partir de un vertice para hallar al
+                    //v2_mid. Este vertice de partida será siempre del T_actual
+                    //para los sector 1 y 2 y para los sector3y4 será el T_next
+                    //notar que se está hallando el tripivot de la Donut
+                    //anterior (i-1). Pero para "angulos particulares" el tripivot
+                    //pertenece a la siguiente Donut!!! (con suerte, este no es el caso)
+                    v2_mid=Tripivot[(j+((sector>>1)&0x1))*3+0];//---->es indiferente si es el vertice 0 o 1, están en la misma recta(?)
+                    paso_mid=pasoL1*(1.0-2.0*(tipo^((sector>>1)&0x1)));
+                    //no hace falta hacer mask ya que siempre es con la Donut
+                    //anterior y los Trifill ocurren a partir de la donut 2, es
+                    //decir i>=3. Además, el tema de concatenación ocurre más en 
+                    //la donut referencial
+                    x_point=Point_Cloud[(v2_mid+paso_mid)*3+0];
+                    y_point=Point_Cloud[(v2_mid+paso_mid)*3+1];
+                    z_point=Point_Cloud[(v2_mid+paso_mid)*3+2];
+                    freepoints_mid=0;
+                    while ((x_point!=0)||(y_point!=0)||(z_point!=0)){
+                        v2_mid+=paso_mid;
+                        freepoints_mid++;//realizado el conteo de cuantos puntos libres
+                        x_point=Point_Cloud[(v2_mid+paso_mid)*3+0];
+                        y_point=Point_Cloud[(v2_mid+paso_mid)*3+1];
+                        z_point=Point_Cloud[(v2_mid+paso_mid)*3+2];    
+                    }
+                    //Hallamos el triangulo pivot Repetimos el código de líneas arriba
+                    //------------------TRIPIVOT MIDDLE----------------//
+                    k_beam=(n_beams-1)*(1.0-((sector>>1)&0x1));
+                    //realizamos la operación
+                    get_tripivot(&v0_mid,&v1_mid,&Point_Cloud[v2_mid*3],sector,i-1,k_beam);
+                    if ((sector>>1)&0x1){
+                        //definimos el sentido horario Ya que para los sectors 3 y 4
+                        //El sentido de los vértices es distinto a los de los
+                        //primeros sector. Entonces para seguir la jerarquía de los
+                        //sentidos, cambiamos aqui
+                        //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        //%%% Esto podría ser o o importante                        %
+                        //%%% Capaz, se puede definir un sentido para un lado y otro%
+                        //%%% para los otros sector ()sector3 y sector4)                  %
+                        //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                        v_temp=v0_mid;
+                        v0_mid=v1_mid;
+                        v1_mid=v_temp;
+                    }
+                    T_mid[0]=v0_mid;
+                    T_mid[1]=v1_mid;
+                    T_mid[2]=v2_mid;
+                    /*------------Fin TRIPIVOT MIDDLE-------------*/
+                    /*----------Primer llenado----------*/
+                    //Definimos los v_lim Para hacer el primer llenado
+                    a=(sector>>1)&0x1;
+                    b=sector&0x1;
+                    c=escalera;
+                    //v0_lim será el vertice limite para el v_corner
+                    v0_lim=Tripivot[(j+(tipo^0x1))*3+2];
+                    //v1_lim será el vertice limite para el v_init
+                    index= 2 - (a^(0x1^(b^c))) - (0x1^((a^b)|c));
+                    v1_lim=T_mid[index];
+                    //procedemos a realizar el primer llenado
+                    //Creamos el primer triangulo
+                    v0=Tripivot[(j+tipo)*3+2];
+                    v1=v_init;
+                    v2=v_corner;
+                    TriDF[n_Tritriangles*3+0]=v0;
+                    TriDF[n_Tritriangles*3+1]=v1;
+                    TriDF[n_Tritriangles*3+2]=v2;
+                    n_Tritriangles++;
+                    side2sideFill(v2,v1,v0_lim,v1_lim,pasoL0,pasoL1,TriDF,&n_Tritriangles);
+                    /*----------Fin Primer llenado----------*/
+                    /*----------Segundo llenado----------*/
+                    index=((sector>>1)&0x1)^((sector&0x1)^escalera);
+                    index= 2- index- (escalera&&(0x1^((sector&0x1)^((sector>>1)&0x1))));
+                    //Creamos el triangulo de transicion
+                    v0=v1_lim;
+                    v1=T_mid[index];//Definimos el nuevo v_init
+                    v2=v_corner_fin;
+                    TriDF[n_Tritriangles*3+0]=v0;
+                    TriDF[n_Tritriangles*3+1]=v1;
+                    TriDF[n_Tritriangles*3+2]=v2;
+                    n_Tritriangles++;
+                    side2sideFill(v2,v1,v_corner_fin,v_fin,pasoL0,pasoL1,TriDF,&n_Tritriangles);
+                    /*----------Fin Segundo llenado----------*/
                 }
             }
             /*--------------------FIN FILL sector--------------------*/
@@ -763,10 +850,92 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
             }            
         }
         /*Middle Fill*/
-
+        //sector1 con sector2
+        vleft_init=Tripivot_middle[2];
+        vrigth_init=Tripivot_middle[1];
+        vleft_fin=Tripivot_middle[3+2];
+        vrigth_fin=Tripivot_middle[3+0];
+        pasoLeft=n_beams;
+        pasoRigth=pasoLeft;
+        side2sideFill(vleft_init,vrigth_init,vleft_fin,vrigth_fin,pasoLeft,pasoRigth,MidDF,&n_Midtriangles);
+        //sector3 con sector4
+        vleft_init=Tripivot_middle[3*3+2];
+        vrigth_init=Tripivot_middle[3*3+1];
+        vleft_fin=Tripivot_middle[2*3+2];
+        vrigth_fin=Tripivot_middle[2*3+0];
+        pasoLeft=-n_beams;
+        pasoRigth=pasoLeft;
+        side2sideFill(vleft_init,vrigth_init,vleft_fin,vrigth_fin,pasoLeft,pasoRigth,MidDF,&n_Midtriangles);
+        if ((i==(n_donuts-1))&&(n_tripivot>1)){
+            vrigth_init=Tripivot_middle_particular[0];
+            vleft_init=Tripivot_middle_particular[2];
+            vrigth_fin=Tripivot_middle_particular[3+1];
+            vleft_fin=Tripivot_middle_particular[3+2];
+            pasoRigth=-n_beams;
+            pasoLeft=-pasoRigth;
+            side2sideFill(vleft_init,vrigth_init,vleft_fin,vrigth_fin,pasoLeft,pasoRigth,MidDF,&n_Midtriangles);
+            vrigth_init=Tripivot_middle_particular[3*3+0];
+            vleft_init=Tripivot_middle_particular[3*3+2];
+            vrigth_fin=Tripivot_middle_particular[2*3+1];
+            vleft_fin=Tripivot_middle_particular[2*3+2];
+            pasoRigth=n_beams;
+            pasoLeft=-pasoRigth;
+            side2sideFill(vleft_init,vrigth_init,vleft_fin,vrigth_fin,pasoLeft,pasoRigth,MidDF,&n_Midtriangles);
+        }
     }
 }
-
+/*----------------------------------------------------------------------------*/
+/**
+ * \brief Generate_surface. Genera la superficie
+ * 
+ * \param Point_Cloud es el puntero que tendrá los puntos de la nube de puntos de la data real  
+ * 
+ * \param T es el puntero donde se almacenará los vértices de los triángulos de la data real
+ * 
+ * \return None
+ */
+void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_n_triangles){
+    double* Sphere_Cloud;
+    Sphere_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
+    unsigned int *T_temp;
+    T_temp=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
+    Generate_sphere(Sphere_Cloud);
+    Supress_redundant_data(Sphere_Cloud);
+    One_Donut_Fill(Sphere_Cloud,T_temp);
+    TwoandTri_Donut_Fill(Sphere_Cloud,&T_temp[OneDonutFill_triangles*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);    
+    /*Procedemos a chequear que los vertices son no nulos*/
+    unsigned int temp_vex,n_triangles=0;
+    double xp,yp,zp;
+    for (unsigned int i = 0; i < n_total_triangles; i++){
+        //Analizamos el punto del vertice v0
+        temp_vex=T_temp[i*3];
+        xp=Point_Cloud[temp_vex*3+0];
+        yp=Point_Cloud[temp_vex*3+1];
+        zp=Point_Cloud[temp_vex*3+2];
+        if ((xp!=0)||(yp!=0)||(zp!=0)){
+            //analizamos el punto del vertice v1
+            temp_vex=T_temp[i*3+1];
+            xp=Point_Cloud[temp_vex*3+0];
+            yp=Point_Cloud[temp_vex*3+1];
+            zp=Point_Cloud[temp_vex*3+2];
+            if ((xp!=0)||(yp!=0)||(zp!=0)){
+                //analizamos el punto del vertice v2
+                temp_vex=T_temp[i*3+2];
+                xp=Point_Cloud[temp_vex*3+0];
+                yp=Point_Cloud[temp_vex*3+1];
+                zp=Point_Cloud[temp_vex*3+2];
+                if ((xp!=0)||(yp!=0)||(zp!=0)){
+                    //Si todo lo anterior se cumple, guardamos el triángulo
+                    T[n_triangles*3+2]=temp_vex;
+                    T[n_triangles*3+1]=T_temp[i*1];
+                    T[n_triangles*3]=T_temp[i*1];
+                    n_triangles++;
+                }
+            }
+        }
+    }
+    pointer_n_triangles[0]=n_triangles;    
+}
 /*----------------------------------------------------------------------------*/
 int main()
 {
@@ -787,44 +956,76 @@ int main()
     One_Donut_Fill(Point_Cloud,T_ODF);
     TwoandTri_Donut_Fill(Point_Cloud,T_TwoDF,T_TriDF,T_MidDF);
     /*Escribimos la data obtenida en un archivo csv*/
-
     FILE* archivo;
+    /*Creamos el csv de la esfera sin traslape*/
     archivo = fopen("Sphere_cloud.csv", "w+");
     fprintf(archivo, "X, Y, Z\n");
     for (unsigned int i=0; i < n_total_points; i++) {
         fprintf(archivo,"%.4f, %.4f, %.4f\n", Point_Cloud[i*3+0], Point_Cloud[i * 3 + 1], Point_Cloud[i * 3 + 2]);
     }
     fclose(archivo);
-
+    /*Creamos el csv del mesh del OneDonutfill*/
     archivo = fopen("One_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < OneDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_ODF[i*3+0], T_ODF[i * 3 + 1], T_ODF[i * 3 + 2]);
     }
     fclose(archivo);
-    
+    /*Creamos el csv del mesh del TwoDonutfill*/
     archivo = fopen("Two_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < TwoDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_TwoDF[i*3+0], T_TwoDF[i * 3 + 1], T_TwoDF[i * 3 + 2]);
     }
     fclose(archivo);
-    
+    /*Creamos el csv del mesh del TriDonutfill*/
     archivo = fopen("Tri_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < TriDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_TriDF[i*3+0], T_TriDF[i * 3 + 1], T_TriDF[i * 3 + 2]);
     }
     fclose(archivo);
-
+    /*Creamos el csv del mesh del MidDonutfill*/
     archivo = fopen("Mid_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < MidDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_MidDF[i*3+0], T_MidDF[i * 3 + 1], T_MidDF[i * 3 + 2]);
     }
     fclose(archivo);
-
     //------------------------------//
+    /*Juntamos todas las funciones. Point_Cloud es la data real*/
+    double *Point_Cloud_real_data;
+    Point_Cloud_real_data = (double*)malloc(n_total_points * 3 *sizeof(double));
+    //Leemos del csv los datos reales
+    archivo = fopen("dataMina.csv", "r");
+    char buffer[200];
+    char* token;
+    //Saltamos la primera línea
+    fgets(buffer,sizeof(buffer),archivo);
+    for (unsigned int i = 0; i < n_total_points; i++)
+    {
+        fgets(buffer,sizeof(buffer),archivo);
+        token = strtok(buffer,",");
+        Point_Cloud_real_data[i*3+0]=atof(token);
+        token = strtok(NULL,",");
+        Point_Cloud_real_data[i*3+1]=atof(token);
+        token = strtok(NULL,",\n");
+        Point_Cloud_real_data[i*3+2]=atof(token);
+    }    
+    fclose(archivo);    
+    unsigned int *T,n_triangles_real_data;
+    T=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
+    Generate_surface(Point_Cloud_real_data,T,&n_triangles_real_data);
+    //Creamos el archivo csv
+    archivo = fopen("Triangle_mesh.csv", "w+");
+    fprintf(archivo, "V1, V2, V3\n");
+    for (unsigned int i=0; i < n_triangles_real_data; i++) {
+        fprintf(archivo,"%d, %d, %d\n", T[i*3+0], T[i * 3 + 1], T[i * 3 + 2]);
+    }
+    fclose(archivo);
+    /*Creamos el archivo dxf*/
+    
+    
     /*Testing function*/
     double A[12] = { 1,2,3,4,5,6,7,8,9,10,11,12 };
     double B[12] = { 10,7,4,1,11,8,5,2,12,9,6,3};

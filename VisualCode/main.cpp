@@ -1079,7 +1079,7 @@ int main()
         z2 = Point_Cloud[T[i* 3+2]*3 + 2];
         //create new 3DFACE element
         fprintf(archivo, "3DFACE\n8\n1\n");
-        fprintf(archivo, " 62\n %d\n", 112);//corresponding color of the autocad pallete
+        fprintf(archivo, " 62\n %d\n", 142);//corresponding color of the autocad pallete
         fprintf(archivo, "10\n %.4f\n 20\n %.4f\n 30\n %.4f\n", x0, y0, z0);
         fprintf(archivo, "11\n %.4f\n 21\n %.4f\n 31\n %.4f\n", x1, y1, z1);
         fprintf(archivo, "12\n %.4f\n 22\n %.4f\n 32\n %.4f\n", x2, y2, z2);

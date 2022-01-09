@@ -338,7 +338,7 @@ void One_Donut_Fill(double* Point_Cloud,unsigned int* T){
             }
         }
     }
-    printf("numero de triangulos: %d\n",count+n_triangles_perDonut);    
+    //printf("numero de triangulos: %d\n",count+n_triangles_perDonut);    
 }
 /*----------------------------------------------------------------------------*/
 /**
@@ -903,6 +903,21 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_
     Supress_redundant_data(Sphere_Cloud);
     One_Donut_Fill(Sphere_Cloud,T_temp);
     TwoandTri_Donut_Fill(Sphere_Cloud,&T_temp[OneDonutFill_triangles*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);    
+    /*Verificamos con csv*/
+    //FILE* archivo;
+    /*Creamos el csv de la esfera sin traslape*/
+    // archivo = fopen("esfera.csv", "w+");
+    // fprintf(archivo, "X, Y, Z\n");
+    // for (unsigned int i=0; i < n_total_points; i++) {
+    //     fprintf(archivo,"%.4f, %.4f, %.4f\n", Sphere_Cloud[i*3+0], Sphere_Cloud[i * 3 + 1], Sphere_Cloud[i * 3 + 2]);
+    // }
+    // fclose(archivo);
+    // archivo = fopen("T.csv", "w+");
+    // fprintf(archivo, "v1, v2, v3\n");
+    // for (unsigned int i=0; i < n_total_triangles; i++) {
+    //     fprintf(archivo,"%d, %d, %d\n", T_temp[i*3+0], T_temp[i * 3 + 1], T_temp[i * 3 + 2]);
+    // }
+    // fclose(archivo); 
     /*Procedemos a chequear que los vertices son no nulos*/
     unsigned int temp_vex,n_triangles=0;
     double xp,yp,zp;
@@ -912,29 +927,31 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_
         xp=Point_Cloud[temp_vex*3+0];
         yp=Point_Cloud[temp_vex*3+1];
         zp=Point_Cloud[temp_vex*3+2];
-        if ((xp!=0)||(yp!=0)||(zp!=0)){
+        if ((xp!=0)&&(yp!=0)&&(zp!=0)){
             //analizamos el punto del vertice v1
             temp_vex=T_temp[i*3+1];
             xp=Point_Cloud[temp_vex*3+0];
             yp=Point_Cloud[temp_vex*3+1];
             zp=Point_Cloud[temp_vex*3+2];
-            if ((xp!=0)||(yp!=0)||(zp!=0)){
+            if ((xp!=0)&&(yp!=0)&&(zp!=0)){
                 //analizamos el punto del vertice v2
                 temp_vex=T_temp[i*3+2];
                 xp=Point_Cloud[temp_vex*3+0];
                 yp=Point_Cloud[temp_vex*3+1];
                 zp=Point_Cloud[temp_vex*3+2];
-                if ((xp!=0)||(yp!=0)||(zp!=0)){
+                if ((xp!=0)&&(yp!=0)&&(zp!=0)){
                     //Si todo lo anterior se cumple, guardamos el triángulo
                     T[n_triangles*3+2]=temp_vex;
-                    T[n_triangles*3+1]=T_temp[i*1];
-                    T[n_triangles*3]=T_temp[i*1];
+                    T[n_triangles*3+1]=T_temp[i*3+1];
+                    T[n_triangles*3]=T_temp[i*3];
                     n_triangles++;
                 }
             }
         }
     }
-    pointer_n_triangles[0]=n_triangles;    
+    pointer_n_triangles[0]=n_triangles; 
+    free(Sphere_Cloud);
+    free(T_temp);   
 }
 /*----------------------------------------------------------------------------*/
 int main()
@@ -992,62 +1009,111 @@ int main()
         fprintf(archivo,"%d, %d, %d\n", T_MidDF[i*3+0], T_MidDF[i * 3 + 1], T_MidDF[i * 3 + 2]);
     }
     fclose(archivo);
-    //------------------------------//
-    /*Juntamos todas las funciones. Point_Cloud es la data real*/
-    double *Point_Cloud_real_data;
-    Point_Cloud_real_data = (double*)malloc(n_total_points * 3 *sizeof(double));
+    free(T_ODF);
+    free(T_TwoDF);
+    free(T_TriDF);
+    free(T_MidDF);
+    /*****************************************************/
+    /**************Integramos las funciones***************/
+    /*****************************************************/
     //Leemos del csv los datos reales
     archivo = fopen("dataMina.csv", "r");
     char buffer[200];
     char* token;
     //Saltamos la primera línea
     fgets(buffer,sizeof(buffer),archivo);
-    for (unsigned int i = 0; i < n_total_points; i++)
-    {
+    for (unsigned int i = 0; i < n_total_points; i++){
         fgets(buffer,sizeof(buffer),archivo);
         token = strtok(buffer,",");
-        Point_Cloud_real_data[i*3+0]=atof(token);
+        Point_Cloud[i*3+0]=atof(token);
         token = strtok(NULL,",");
-        Point_Cloud_real_data[i*3+1]=atof(token);
+        Point_Cloud[i*3+1]=atof(token);
         token = strtok(NULL,",\n");
-        Point_Cloud_real_data[i*3+2]=atof(token);
+        Point_Cloud[i*3+2]=atof(token);
     }    
     fclose(archivo);    
     unsigned int *T,n_triangles_real_data;
     T=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
-    Generate_surface(Point_Cloud_real_data,T,&n_triangles_real_data);
-    //Creamos el archivo csv
+    /*****************************************************/
+    /***********Obtenemos la malla triangular*************/
+    /*****************************************************/
+    //Tambien evaluamos tiempo
+    clock_t startCPU;
+	clock_t finishCPU;
+	printf("\nTiempo de ejecucion en CPU:\n");
+	startCPU = clock();
+    for (int i;i<100;i++){
+        Generate_surface(Point_Cloud,T,&n_triangles_real_data);
+    }
+	finishCPU = clock();
+	printf("CPU: %fms\n", (double)(finishCPU - startCPU) / 1000 / 100);/// CLK_TCK);
+	//Creamos el archivo csv
     archivo = fopen("Triangle_mesh.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < n_triangles_real_data; i++) {
         fprintf(archivo,"%d, %d, %d\n", T[i*3+0], T[i * 3 + 1], T[i * 3 + 2]);
     }
     fclose(archivo);
-    /*Creamos el archivo dxf*/
-    
-    
-    /*Testing function*/
-    double A[12] = { 1,2,3,4,5,6,7,8,9,10,11,12 };
-    double B[12] = { 10,7,4,1,11,8,5,2,12,9,6,3};
-    double C[16];
-    mult_matrix(A, 1, 3, B, 4, C);
-    for (int z=0; z < 1; z++) {
-        for (int w=0; w < 4; w++) {
-            printf("%.3f\t", C[z*4+w]);
-        }
-        printf("\n");
+    //------------------------------------------
+	//----------Generate the DXF file-----------
+	//------------------------------------------
+	//Open the DXF file
+    archivo = fopen("surfaceMina.dxf", "w");
+    //assert(archivo);
+    //header
+    fprintf(archivo, "0\nSECTION\n2\nENTITIES\n0\n");
+	float x0,y0,z0,x1,y1,z1,x2,y2,z2;
+	for (int i = 0; i < n_triangles_real_data; i++)
+    {
+        // get the coordinates of each point from the triangle
+        x0 = Point_Cloud[T[i* 3+0]*3 + 0];
+        y0 = Point_Cloud[T[i* 3+0]*3 + 1];
+        z0 = Point_Cloud[T[i* 3+0]*3 + 2];
+        
+        x1 = Point_Cloud[T[i* 3+1]*3 + 0];
+        y1 = Point_Cloud[T[i* 3+1]*3 + 1];
+        z1 = Point_Cloud[T[i* 3+1]*3 + 2];
+        
+        x2 = Point_Cloud[T[i* 3+2]*3 + 0];
+        y2 = Point_Cloud[T[i* 3+2]*3 + 1];
+        z2 = Point_Cloud[T[i* 3+2]*3 + 2];
+        //create new 3DFACE element
+        fprintf(archivo, "3DFACE\n8\n1\n");
+        fprintf(archivo, " 62\n %d\n", 112);//corresponding color of the autocad pallete
+        fprintf(archivo, "10\n %.4f\n 20\n %.4f\n 30\n %.4f\n", x0, y0, z0);
+        fprintf(archivo, "11\n %.4f\n 21\n %.4f\n 31\n %.4f\n", x1, y1, z1);
+        fprintf(archivo, "12\n %.4f\n 22\n %.4f\n 32\n %.4f\n", x2, y2, z2);
+        fprintf(archivo, "13\n %.4f\n 23\n %.4f\n 33\n %.4f\n", x2, y2, z2);
+        fprintf(archivo, "0\n");
     }
-    //-----------------------------// 
-    /*Testing rot axis*/
-    double temp[3] = { 2,4,5 };
-    printf("Antes:\n%.3f\t%.3f\t%.3f\n", temp[0], temp[1], temp[2]);
-    rot_x_axis(temp,MPI);
-    printf("Despues:\n%.3f\t%.3f\t%.3f\n", temp[0], temp[1], temp[2]);
-    //----------------------------//
-    /*Testing n_donuts value*/
-    printf("Hola mundo %d %f\n", n_donuts,beam_altitude_angles[2]);
-    /* for (int i=0;i<n_beams; i++) {
-        printf("%f\n", beam_altitude_angles[i]);
-    }*/
+    fprintf(archivo, "ENDSEC\n 0\nEOF\n");
+    fclose(archivo);
+    //Finalmente, liberamos el resto de memoria
+    free(Point_Cloud);
+    free(T);    
+    //------------------------------//
+    /*Testing function*/
+    // double A[12] = { 1,2,3,4,5,6,7,8,9,10,11,12 };
+    // double B[12] = { 10,7,4,1,11,8,5,2,12,9,6,3};
+    // double C[16];
+    // mult_matrix(A, 1, 3, B, 4, C);
+    // for (int z=0; z < 1; z++) {
+    //     for (int w=0; w < 4; w++) {
+    //         printf("%.3f\t", C[z*4+w]);
+    //     }
+    //     printf("\n");
+    // }
+    // //-----------------------------// 
+    // /*Testing rot axis*/
+    // double temp[3] = { 2,4,5 };
+    // printf("Antes:\n%.3f\t%.3f\t%.3f\n", temp[0], temp[1], temp[2]);
+    // rot_x_axis(temp,MPI);
+    // printf("Despues:\n%.3f\t%.3f\t%.3f\n", temp[0], temp[1], temp[2]);
+    // //----------------------------//
+    // /*Testing n_donuts value*/
+    // printf("Hola mundo %d %f\n", n_donuts,beam_altitude_angles[2]);
+    // /* for (int i=0;i<n_beams; i++) {
+    //     printf("%f\n", beam_altitude_angles[i]);
+    //}*/
     return 0;
 }

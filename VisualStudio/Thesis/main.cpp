@@ -35,7 +35,9 @@ double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos
 #define n_total_points (unsigned int)(n_donuts*n_points_perDonut)
 /*Cantidad de triángulos*/
 #define OneDonutFill_triangles          108226
-#define TwoandTriDonutFill_triangles    10036
+#define TwoDonutFill_triangles          6883
+#define TriDonutFill_triangles          6883
+#define MidDonutFill_triangles          6883
 
 /*----------------------------------------------------------------------------*/
 /**
@@ -253,8 +255,8 @@ void Supress_redundant_data(double* Point_Cloud){
             //Calculamos el valor de y_temp el cual limitará la zona
             y_temp=eq_line(L[(i-2)*5+4],x,L[(i-2)*5+left_side*2],L[(i-2)*5+left_side*2+1]);
             //Le colocamos un signo negativo, o no, para poder realizar un único condicional para ambos casos
-            y_temp=y_temp*(1-2*left_side);
-            y=y*(1-2*left_side);
+            y_temp=y_temp*(1.0-2*left_side);
+            y=y*(1.0-2*left_side);
             //Evaluamos la condición de supresión
             if (y>=y_temp){
                 //Eliminamos los puntos
@@ -357,11 +359,11 @@ void One_Donut_Fill(double* Point_Cloud,unsigned int* T){
  * 
  * \return None
  */
-void get_tripivot(unsigned int *v0_pointer,unsigned int *v1_pointer,double *point,unsigned int sector,unsigned int i,unsigned int k_beam){
+void get_tripivot(unsigned int *vmin_pointer,unsigned int *vmax_pointer,double *point,unsigned int sector,unsigned int i,unsigned int k_beam){
     //Definimos las variables
-    unsigned int offset,k_azimuth,v0_temp,v1_temp,v_temp;
+    unsigned int offset,k_azimuth,vmin,vmax;
     double y_data,z_data,theta,rot_theta,alfa;
-    double *rot_point;
+    double rot_point[3];
     //Se debe tener en cuenta los rango de acos y asin
     //  acos: [0~pi]
     //  atan: [-pi/2~pi/2]
@@ -375,8 +377,8 @@ void get_tripivot(unsigned int *v0_pointer,unsigned int *v1_pointer,double *poin
     //realizamos un antigiro para que la Donut previa "aparente" ser la referencial y
     //usar las funciones ya establecidas
     rot_z_axis(rot_point, -rot_angle*(i-1));
-    rot_theta=-acos(rot_point[1]/Radius_sphere);
-    if (theta*(1-2*((sector>>1)&0x1)) >= rot_theta*(1-2*((sector>>1)&0x1)))
+    rot_theta=-acos(rot_point[0]/Radius_sphere);
+    if (theta*(1.0-2.0*((sector>>1)&0x1)) >= rot_theta*(1.0-2*((sector>>1)&0x1)))
     {
         //Los vértices pertenecen a la Donut referencias
         y_data=point[1];
@@ -396,36 +398,122 @@ void get_tripivot(unsigned int *v0_pointer,unsigned int *v1_pointer,double *poin
     //esto al final no perjudica ya que se hace el masking de bits
     //solo que tener en cuenta que la división entre -2pi/ang_bet_azit
     //da un total de 1024.
-    alfa=alfa-2*pi;
+    alfa=alfa-2*MPI;
     //Con lo anterior, nos hemos asegurado que el alfa sea siempre negativo
     //Calculamos el azimuth que corresponde al alfa
     k_azimuth=(unsigned int)((alfa-beam_azimuth_angles[k_beam])/angle_between_azimuths);
-    v0_temp=(k_azimuth)*n_beams+k_beam;
+    vmin=(k_azimuth)*n_beams+k_beam;
     //Enmascaramos
-    v0_temp=v0_temp&mask;
-    v1_temp=(v0_temp+n_beams)&mask;
+    vmin=vmin&mask;
+    vmax=(vmin+n_beams)&mask;
     //Realizamos offset y sentido
-    v0_temp+=offset;
-    v1_temp+=offset;
-    /*Debemos establecer el orden de los vértices, es decir horario o antihorario*/
-    //Esto depende del sector
-    if ((sector>>1)&0x1){
-        //definimos el sentido horario Ya que para los sectors 3 y 4
-        //El sentido de los vértices es distinto a los de los
-        //primeros sector. Entonces para seguir la jerarquía de los
-        //sentidos, cambiamos aqui
-        //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        //%%% Esto podría ser o o importante                        %
-        //%%% Capaz, se puede definir un sentido para un lado y otro%
-        //%%% para los otros sector ()sector3 y sector4)            %
-        //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-        v_temp=v0_temp;
-        v0_temp=v1_temp;
-        v1_temp=v_temp;
-    }
-    *v0_pointer=v0_temp;
-    *v1_pointer=v1_temp;
+    vmin+=offset;
+    vmax+=offset;
+    *vmin_pointer=vmin;
+    *vmax_pointer=vmax;
                 
+}
+/*----------------------------------------------------------------------------*/
+/**
+ * \brief side2sideFill. Dado una nube de puntos sin traslape y siguiendo 
+ * el patrón de medición definido por el sistema Ouster-motor, se obtiene como 
+ * 
+ * \param parameter-name description
+ * 
+ * \return None
+ */
+void side2sideFill( unsigned int vL0_init,unsigned int vL1_init,
+                    unsigned int vL0_fin,unsigned int vL1_fin,
+                    int pasoL0,int pasoL1,
+                    unsigned int* T,unsigned int* n_triangles_pointer)
+{
+    unsigned int vmax,vmin,v0,v1,v2,v1_fin,v2_fin,v_temp;
+    int freepointsL0,freepointsL1,pasov1,pasov2,arista_mismo_vex;
+    //Realizamos algunos ajustes para poder obterner el valor magnitud de
+    //los puntos libres tanto para la izquierda y derecha
+    if (pasoL0<0){
+        vmax=vL0_init&mask;
+        vmin=vL0_fin&mask;
+    }else{
+        vmax=vL0_fin&mask;
+        vmin=vL0_init&mask;
+    }
+    freepointsL0=((vmax+(mask-vmin)+1)&mask)/abs(pasoL0);
+    if (pasoL1<0){
+        vmax=vL1_init&mask;
+        vmin=vL1_fin&mask;
+    }else{
+        vmax=vL1_fin&mask;
+        vmin=vL1_init&mask;
+    }
+    freepointsL1=((vmax+(mask-vmin)+1)&mask)/abs(pasoL1);
+    //Con las siguientes formulas podemos hallar con que Donut 
+    //estamos trabajando y obtener el offset adecuado
+    unsigned int offsetL0=n_points_perDonut*floor(double((vL0_init-1))/n_points_perDonut);
+    unsigned int offsetL1=n_points_perDonut*floor(double((vL1_init-1))/n_points_perDonut);
+    unsigned int offset;
+    //considero que "v2 es de L0" y "v1 es de L1"
+    v2=vL0_init;
+    v1=vL1_init;
+    v2_fin=vL0_fin;
+    v1_fin=vL1_fin;
+    pasov2=pasoL0;
+    pasov1=pasoL1;
+    //la siguiente variable es para el caso que el vertice en comun este en L2
+    bool volteamos=false;
+    //Analizamos si tenemos distintos puntos
+    if (freepointsL1!=freepointsL0){
+        //Realizamos un triangulo con mismo vertice
+        arista_mismo_vex=freepointsL1-freepointsL0;
+        offset=offsetL1;
+        if (arista_mismo_vex<0){
+            //En caso L1 tenga mas puntos el v_comun estará en L2
+            v2=vL1_init;
+            v1=vL0_init;
+            pasov1=pasoL0;
+            offset=offsetL0;
+            arista_mismo_vex=arista_mismo_vex*-1;
+            volteamos=true;
+        }
+        for (unsigned int j=0;j<arista_mismo_vex;j++){
+            v0=v1;
+            //debemos realizar el offset adecuado segun la Donut con la que
+            //trabajamos. Primero le sumamos el mask y luego el paso, esto para obtener
+            //la concatenación en la misma Donut. Luego le sumamos el offset de la Donut
+            //le sumamos la unidad para que luego de hacer el bitmasking obtengamos el mismo
+            //numero
+            v1=(((v1+mask+1)+pasov1)&mask)+offset;
+            T[n_triangles_pointer[0]*3+0]=v0;
+            T[n_triangles_pointer[0]*3+1]=v1;
+            T[n_triangles_pointer[0]*3+2]=v2;
+            n_triangles_pointer[0]++;
+        }
+        if (volteamos){
+            //en caso habiamos volteado, volvemos al caso inicial
+            v_temp=v2;
+            v2=v1;
+            v1=v_temp;
+            pasov1=pasoL1;
+        }
+    }
+    //Realizamos el llenado "alineado"
+    while (v1!=v1_fin){
+        v0=v1;
+        //Con esta formula podemos obtener la concatenación de Donuts
+        v1=(((v2+mask+1)+pasov2)&mask)+offsetL0;
+        T[n_triangles_pointer[0]*3+0]=v0;
+        T[n_triangles_pointer[0]*3+1]=v1;
+        T[n_triangles_pointer[0]*3+2]=v2;
+        n_triangles_pointer[0]++;
+        v2=v1;
+        //Esta formula permite avanzar por medio del enmascaramiento sin
+        //necesidad de usar condicionales (equivalente al operador modulo)
+        v1=(((v0+mask+1)+pasov1)&mask)+offsetL1;
+        T[n_triangles_pointer[0]*3+0]=v0;
+        T[n_triangles_pointer[0]*3+1]=v1;
+        T[n_triangles_pointer[0]*3+2]=v2;
+        n_triangles_pointer[0]++;
+    }
 }
 
 /*----------------------------------------------------------------------------*/
@@ -449,18 +537,32 @@ void get_tripivot(unsigned int *v0_pointer,unsigned int *v1_pointer,double *poin
  * 
  * \return None
  */
-#define NO_VEX_FOUND -1 
-void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* T){
+void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* TriDF,unsigned int* MidDF){
     int paso;
-    unsigned int n_tripivot,init_index,v0,v1,v2,k_beam;
+    unsigned int n_tripivot,init_index,k_beam;
+    unsigned int n_Twotriangles=0,n_Tritriangles=0,n_Midtriangles=0;
     double x_point,y_point,z_point;
-    unsigned int *last_Tripivots;
+    unsigned int Tripivot[16*3];
+    //Creamos el arreglo que contendrá a los cuatro triángulos de cada sector que limitan la zona del medio
+    unsigned int Tripivot_middle[4*3];
+    //Para la última Donut se deben almacenar otros 4 triángulos
+    unsigned int Tripivot_middle_particular[4*3];
+    //last_tripivots almacena los últimos triángulos pivots de lso 4 sectores
+    unsigned int last_Tripivots[4*3]={0,0,0,0,0,0,0,0,0,0,0,0};
     bool vex_found;
+    //variables para clasificar la zona de llenado
+    char escalera,tipo;
+    //Variables de paso
+    int pasoL0,pasoL1;
+    //Variables para operar con los vértices
+    unsigned int v0,v1,v2,v_temp,v_corner,v_corner_fin,v_init,v_fin;
     //A partir de la segunda Donut generamos las superficies
-    for (int i = 0; i < n_donuts; i++){
+    for (int i = 1; i < n_donuts; i++){
         for (unsigned int sector = 0; sector < 4; sector++){
             n_tripivot=0;
-            /*Creamos los tripivots*/
+            /**************************************************************************************/
+            /****************************   Creamos los tripivots   *******************************/
+            /**************************************************************************************/
             for (unsigned int j = 0; j < n_beams; j++){
                 //Debemos hallar el vertice límite distinto de cero, para ello usamos un 
                 //init_index que nos permitirá evaluar cada punto hasta hallar el que es 
@@ -473,10 +575,10 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* T){
                 init_index=(n_AZBLK>>1)*(2-(((sector>>1)&0x1)^(sector&0x1)))-1;
                 init_index=init_index*n_beams+j;
                 //Definimos si el paso será positivo o negativo, esto dependerá del sector.
-                paso=n_beams*(1-2*(sector&0x1));
+                paso=n_beams*(1.0-2*(sector&0x1));
                 //Creamos bandera para saber si se halló un vértice para crear el tripivot
                 vex_found=false;
-                for (unsigned int count = 0; count < n_AZBLK; count++){
+                for (unsigned int count = 0; count < (n_AZBLK>>2); count++){
                     //Entramos en un bucle donde evaluamos los puntos de la Donut hasta hallar
                     //el punto que sea distinto de cero
                     x_point=Point_Cloud[i*n_points_perDonut*3+init_index*3+0];  
@@ -488,8 +590,6 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* T){
                         vex_found=true;
                         //Agregamos el offset de la Donut correspondiente
                         v2=init_index+i*n_points_perDonut;
-                        //Realizamos un conteo de los tripivot
-                        n_tripivot++;
                         break;
                     }
                     //Realizamos el paso correspondiente a init_index
@@ -498,26 +598,173 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* T){
                 //Evaluamos el caso que no se consiguió el vértice
                 if (!vex_found){
                     //Evaluamos para los siguientes beams
-                    continue
+                    continue;
                 }
                 /*Procedemos a hallar los demás vértices del tripivot*/
                 //Dependiendo del sector estamos más cerca del beam=0 o el beam=15
                 k_beam=(n_beams-1)*(1-(sector>>1)&0x1);
                 ///Hallamos los otros vértices
-                get_tripivot(&v0,&v1,&Point_Cloud[v2],sector,i,k_beam);
-                //continuamos aqui:
-
-
-
-
-                
+                get_tripivot(&v0,&v1,&Point_Cloud[v2*3],sector,i,k_beam);
+                /*Debemos establecer el orden de los vértices, es decir horario o antihorario*/
+                //Esto depende del sector
+                if ((sector>>1)&0x1){
+                    //definimos el sentido horario Ya que para los sectors 3 y 4
+                    //El sentido de los vértices es distinto a los de los
+                    //primeros sector. Entonces para seguir la jerarquía de los
+                    //sentidos, cambiamos aqui
+                    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    //%%% Esto podría ser o o importante                        %
+                    //%%% Capaz, se puede definir un sentido para un lado y otro%
+                    //%%% para los otros sector ()sector3 y sector4)            %
+                    //%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    v_temp=v0;
+                    v0=v1;
+                    v1=v_temp;
+                }
+                /*Debemos verificar que los vértices no sean cero */
+                //Analizamos el punto del vertice v0
+                x_point=Point_Cloud[v0*3+0];
+                y_point=Point_Cloud[v0*3+1];
+                z_point=Point_Cloud[v0*3+2];
+                if ((x_point==0)&&(y_point==0)&&(z_point==0)){
+                    //Guardamos el valor de v1.//v_temp=v1;
+                    get_tripivot(&v0,&v_temp,&Point_Cloud[v1*3],sector,i,k_beam);
+                    if ((sector>>1)&0x1){
+                        //Deseo el nuevo v0
+                        v0=v_temp;
+                    }
+                    //Devolvemos el valor de v1.//v1=v_temp;
+                }
+                //Analizamos el punto del vertice v1
+                x_point=Point_Cloud[v1*3+0];
+                y_point=Point_Cloud[v1*3+1];
+                z_point=Point_Cloud[v1*3+2];
+                if ((x_point==0)&&(y_point==0)&&(z_point==0)){
+                    get_tripivot(&v_temp,&v1,&Point_Cloud[v0*3],sector,i,k_beam);
+                    if ((sector>>1)&0x1){
+                        //Deseo el nuevo v1
+                        v1=v_temp;
+                    }
+                }
+                /*Debemos verificar concurrencia de vértices en los triángulos pívots con
+                los últimos triangulos pivots de la Donut anterior con el mismo sector*/
+                if (!(((sector>>1)&0x1)^(sector&0x1))){
+                    //sector 1 y 4
+                    if (v1==last_Tripivots[sector*3+1]){
+                        v1=last_Tripivots[sector*3+2];
+                    }
+                }else{
+                    //sector 2 y 3
+                    if (v0==last_Tripivots[sector*3+0]){
+                        v0=last_Tripivots[sector*3+2]; 
+                    }
+                }
+                Tripivot[n_tripivot*3+0]=v0;
+                Tripivot[n_tripivot*3+1]=v1;
+                Tripivot[n_tripivot*3+2]=v2;
+                n_tripivot++;
             }
-            
+            //Guardamos los triángulos hallados 
+            for (unsigned int j= 0; j < n_tripivot; j++){
+                TwoDF[n_Twotriangles*3+0]=Tripivot[j*3+0];
+                TwoDF[n_Twotriangles*3+1]=Tripivot[j*3+1];
+                TwoDF[n_Twotriangles*3+2]=Tripivot[j*3+2];
+                n_Twotriangles++;
+            }
+            //Hallamos los 4 triangulos que limitan la zona del medio de cada sector,
+            //para ello, guardamos el triángulo más cercano al medio
+            Tripivot_middle[sector*3+0]=Tripivot[((n_tripivot-1)*(sector>>1))*3+0];
+            Tripivot_middle[sector*3+1]=Tripivot[((n_tripivot-1)*(sector>>1))*3+1];
+            Tripivot_middle[sector*3+2]=Tripivot[((n_tripivot-1)*(sector>>1))*3+2];
+            if ((i==(n_donuts-1))&&(n_tripivot>0)){
+                //Este caso ocurre en la última Donut, también hallar los 4 triangulos
+                Tripivot_middle_particular[sector*3+0]=Tripivot[((n_tripivot-1)*(0x1^(sector>>1)))*3+0];
+                Tripivot_middle_particular[sector*3+1]=Tripivot[((n_tripivot-1)*(0x1^(sector>>1)))*3+1];
+                Tripivot_middle_particular[sector*3+2]=Tripivot[((n_tripivot-1)*(0x1^(sector>>1)))*3+2];
+            }
+            /**************************************FIN TRIPIVOT************************************/
+            //Ahora con los triángulos pivot hallados, procedemos a realizar el llenado de las zonas.
+            /**************************************************************************************/
+            /**************************************************************************************/
+            /**********                                                                ************/
+            /**********                 TRIDONUTFILL && TWODONUTFILL                   ************/
+            /**********                                                                ************/
+            /**************************************************************************************/
+            /**************************************************************************************/
+            for (unsigned int j = 0; j < n_tripivot-1; j++){
+                //Debemos clasifiicar la zona a llenar, por eso debemos obtener el punto siguiente 
+                //del vertice v2
+                v_temp=Tripivot[j*3+2];                
+                //Particularmente, en los sector 0 y 2 hallamos el punto siguiente pero en los otros
+                //sectores 1 y 3, hallamos el 17mo punto consecuente. Al analizar si este punto es
+                //nulo o no, podemos definir si es una zona tipo escalera o rampa(ver pagina 19 de 
+                //la presentación)
+                x_point=Point_Cloud[(v_temp+1+n_beams*((sector)&0x1))*3+0];
+                y_point=Point_Cloud[(v_temp+1+n_beams*((sector)&0x1))*3+1];
+                z_point=Point_Cloud[(v_temp+1+n_beams*((sector)&0x1))*3+2];
+                //Evaluamos la condición y definimos la forma de la zona
+                if ((x_point==0)||(y_point==0)||(z_point==0)){
+                    //El punto es cero, ha sido suprimido
+                    escalera=sector&0x1;
+                }else{
+                    escalera=!(sector&0x1);
+                }
+                //Definimos el tipo
+                tipo=0x1^((sector&0x1)^escalera);
+                //Luego de definir la forma y el tipo. Podemos definir el valor de pasoL1 para llegar al v_fin
+                pasoL0=n_beams*(1.0-2*(escalera^tipo));
+                //Ahora debemos definir el vertice que estará en la esquina y su lugar puede estar en el beam 
+                //actual o en el beam siguiente o en el beam del siguiente/anterior azimut
+                v_corner=Tripivot[(j+tipo)*3+2]+(1.0-2*tipo)+pasoL0*(0x1^escalera);
+                //definimos los límites
+                v_init=Tripivot[(j+tipo)*3+1-escalera];
+                v_fin=Tripivot[(j+(0x1^tipo))*3+1-(0x1^escalera)];
+                v_corner_fin=Tripivot[(j+(0x1^tipo))*3+2];
+                pasoL1=(1.0-2*(((sector>>1)&0x1)^tipo))*pasoL0;
+                //Para verificar si es de TWO o TRI llenado, se tiene que analizar la condición de
+                //que los vértices pertenezcan a una misma donut. Algo particular que podemos 
+                //destacar es que si es TriDonutFill, necesariamente uno de los vértices pertenece
+                //a la Donuut Referencial. 
+                //Para saber si NO es TriDonutFill basta verificar el MSB del vértice, en este caso
+                //si n_point_perDonut=(2>>14), habría que analizar el bit 14 y ver que este sea distinto
+                //de cero, lo que es lo mismo decir que el vértice no pertene a la Donut referencial
+                //Por lo tanto, para verificar si es TwoDonutFill basta cumplir alguna de estas 
+                //condiciones:
+                //  -Si al hacer el bitshift, ambos vertices tienen un valor distinto de cero
+                //  -Si al hacer el bitshift, ambos vertices tienenun  valor igual a cero.
+                //Lo anterior se puede hacer con bitwise and: vex&(~mask), para ambos casos
+                if ((((~mask)&v_init)==(v_fin&(~mask)))||(((v_fin&(~mask))!=0)&&((v_init&(~mask))!=0))){
+                    /* TwoDonutFill*/
+                    //Creamos el primer triangulo
+                    v0=Tripivot[(j+tipo)*3+2];
+                    v1=v_init;
+                    v2=v_corner;
+                    //Guardamos el triángulo
+                    TwoDF[n_Twotriangles*3+0]=v0;
+                    TwoDF[n_Twotriangles*3+1]=v1;
+                    TwoDF[n_Twotriangles*3+2]=v2;
+                    n_Twotriangles++;
+                    //Creamos la superficie formada por los dos triángulos pivot
+                    side2sideFill(v_corner,v_init,v_corner_fin,v_fin,pasoL0,pasoL1,TwoDF,&n_Twotriangles);
+                }else{
+                    /* TriDonutFill*/
+                    
+                }
+            }
+            /*--------------------FIN FILL sector--------------------*/
+            //la siguiente variable guardará los tripivots pasados para verificar que 
+            //no exista concurrencia de tripivots con la siguiente Donut
+            if (i!=n_donuts){
+                //hacemos este condicional ya que para la última Donut no
+                //necesitamos realizar esto
+                last_Tripivots[sector*3+0]=Tripivot[(0x1^((sector>>1)&0x1))*(n_tripivot-1)*3+0];
+                last_Tripivots[sector*3+1]=Tripivot[(0x1^((sector>>1)&0x1))*(n_tripivot-1)*3+1];
+                last_Tripivots[sector*3+2]=Tripivot[(0x1^((sector>>1)&0x1))*(n_tripivot-1)*3+2];
+            }            
         }
-        
-        
+        /*Middle Fill*/
+
     }
-    
 }
 
 /*----------------------------------------------------------------------------*/
@@ -530,13 +777,15 @@ int main()
     /*Allocate memory*/
     double* Point_Cloud;
     Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
-    unsigned int *T_ODF, *T_TTDF;
+    unsigned int *T_ODF, *T_TwoDF,*T_TriDF,*T_MidDF;
     T_ODF=(unsigned int*)malloc(OneDonutFill_triangles*3*sizeof(unsigned int));
-    T_TTDF=(unsigned int*)malloc(TwoandTriDonutFill_triangles*3*sizeof(unsigned int));
+    T_TwoDF=(unsigned int*)malloc(TwoDonutFill_triangles*3*sizeof(unsigned int));
+    T_TriDF=(unsigned int*)malloc(TriDonutFill_triangles*3*sizeof(unsigned int));
+    T_MidDF=(unsigned int*)malloc(MidDonutFill_triangles*3*sizeof(unsigned int));
     Generate_sphere(Point_Cloud);
     Supress_redundant_data(Point_Cloud);
     One_Donut_Fill(Point_Cloud,T_ODF);
-    TwoandTri_Donut_Fill(Point_Cloud,T_TTDF);
+    TwoandTri_Donut_Fill(Point_Cloud,T_TwoDF,T_TriDF,T_MidDF);
     /*Escribimos la data obtenida en un archivo csv*/
 
     FILE* archivo;
@@ -549,11 +798,31 @@ int main()
 
     archivo = fopen("One_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
-    for (unsigned int i=0; i < n_AZBLK*2*(n_beams-1)*n_donuts; i++) {
+    for (unsigned int i=0; i < OneDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_ODF[i*3+0], T_ODF[i * 3 + 1], T_ODF[i * 3 + 2]);
     }
     fclose(archivo);
+    
+    archivo = fopen("Two_donut_fill.csv", "w+");
+    fprintf(archivo, "V1, V2, V3\n");
+    for (unsigned int i=0; i < TwoDonutFill_triangles; i++) {
+        fprintf(archivo,"%d, %d, %d\n", T_TwoDF[i*3+0], T_TwoDF[i * 3 + 1], T_TwoDF[i * 3 + 2]);
+    }
+    fclose(archivo);
+    
+    archivo = fopen("Tri_donut_fill.csv", "w+");
+    fprintf(archivo, "V1, V2, V3\n");
+    for (unsigned int i=0; i < TriDonutFill_triangles; i++) {
+        fprintf(archivo,"%d, %d, %d\n", T_TriDF[i*3+0], T_TriDF[i * 3 + 1], T_TriDF[i * 3 + 2]);
+    }
+    fclose(archivo);
 
+    archivo = fopen("Mid_donut_fill.csv", "w+");
+    fprintf(archivo, "V1, V2, V3\n");
+    for (unsigned int i=0; i < MidDonutFill_triangles; i++) {
+        fprintf(archivo,"%d, %d, %d\n", T_MidDF[i*3+0], T_MidDF[i * 3 + 1], T_MidDF[i * 3 + 2]);
+    }
+    fclose(archivo);
 
     //------------------------------//
     /*Testing function*/

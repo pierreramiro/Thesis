@@ -7,13 +7,13 @@
 #ifndef MPI//definimos el valor de PI
 #define MPI 3.14159265358979323846
 #define MPI_2 1.57079632679489661923
-#define D180_MPI 0.017453293 //: Degrees180/pi
 #endif
+#define D180_MPI 0.017453293 //: Degrees180/pi
 //#include "mkl.h"
 /*----------------------------------------------------------------------------*/
 /**
  * Definimos los parámetros del LIDAR
- * Se puede usar typedef para juntar los parámetros del LIDAR
+ * Se puede usar typedef para juntar los parámetros del LIDAR, o mejor no.
  */
 /*Cantidad de rayos por azimuth*/
 #define n_beams 16
@@ -96,6 +96,10 @@ void rot_z_axis(double* XYZ_points, double angle) {
  */
 #define Radius_sphere 1.0
 void Generate_sphere(double* Point_Cloud) {
+    /**
+    * Nuestro sistema de referencia será : Eje Z será el eje de giro del motor.
+    *                                      Eje X será el eje de la Donut referencial
+    */
     double R= Radius_sphere;
     /*Generamos el azimuth refencial y los azimuts de cada sector*/
     for (int i = 0; i < n_beams; i++) {
@@ -888,9 +892,15 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
 /**
  * \brief Generate_surface. Genera la superficie
  * 
- * \param Point_Cloud es el puntero que tendrá los puntos de la nube de puntos de la data real  
+ * \param Point_Cloud es el puntero que tendrá los puntos de la nube de puntos 
+ * de la data real  
  * 
- * \param T es el puntero donde se almacenará los vértices de los triángulos de la data real
+ * \param T es el puntero donde se almacenará los vértices de los triángulos de 
+ * la data real
+ * 
+ * \param pointer_n_triangles. Es un puntero que contendrá el valor de la cantidad 
+ * de triángulos generados. Este valor definirá el límite de líneas para los 
+ * archivos de reconstrucción
  * 
  * \return None
  */
@@ -903,22 +913,7 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_
     Supress_redundant_data(Sphere_Cloud);
     One_Donut_Fill(Sphere_Cloud,T_temp);
     TwoandTri_Donut_Fill(Sphere_Cloud,&T_temp[OneDonutFill_triangles*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);    
-    /*Verificamos con csv*/
-    //FILE* archivo;
-    /*Creamos el csv de la esfera sin traslape*/
-    // archivo = fopen("esfera.csv", "w+");
-    // fprintf(archivo, "X, Y, Z\n");
-    // for (unsigned int i=0; i < n_total_points; i++) {
-    //     fprintf(archivo,"%.4f, %.4f, %.4f\n", Sphere_Cloud[i*3+0], Sphere_Cloud[i * 3 + 1], Sphere_Cloud[i * 3 + 2]);
-    // }
-    // fclose(archivo);
-    // archivo = fopen("T.csv", "w+");
-    // fprintf(archivo, "v1, v2, v3\n");
-    // for (unsigned int i=0; i < n_total_triangles; i++) {
-    //     fprintf(archivo,"%d, %d, %d\n", T_temp[i*3+0], T_temp[i * 3 + 1], T_temp[i * 3 + 2]);
-    // }
-    // fclose(archivo); 
-    /*Procedemos a chequear que los vertices son no nulos*/
+     /*Procedemos a chequear que los vertices son no nulos*/
     unsigned int temp_vex,n_triangles=0;
     double xp,yp,zp;
     for (unsigned int i = 0; i < n_total_triangles; i++){
@@ -956,11 +951,7 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_
 /*----------------------------------------------------------------------------*/
 int main()
 {
-    /**
-    * Nuestro sistema de referencia será : Eje Z será el eje de giro del motor.
-    *                                      Eje X será el eje de la Donut referencial
-    */
-    /*Allocate memory*/
+     /*Allocate memory*/
     double* Point_Cloud;
     Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
     unsigned int *T_ODF, *T_TwoDF,*T_TriDF,*T_MidDF;

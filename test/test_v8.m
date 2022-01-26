@@ -580,7 +580,7 @@ fprintf("\nEl tiempo de ejecución total es de: %.4f segundos\n",Time_sphere_gen
 
 %%
 figure(3)
-temp=[OneDonutFill;TwoDonutFill;TriDonutFill;TriMiddleFill];
+temp=[OneDonutFill;TwoDonutFill;TriMiddleFill];
 trimesh(temp,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))
 TotalTriangleMesh=temp;
 % %% RECONSTRUCCIÓN MINA

@@ -198,10 +198,12 @@ void Supress_redundant_data(double* Point_Cloud){
     //Declare tomporary variables
     double x,y,y_temp,x1,y1,xn,yn,m;
     //Set vertical limits
-    double X_L1=Point_Cloud[0],X_Ln=Point_Cloud[15*3+0];
+    double X_L1=Point_Cloud[0],X_Ln=Point_Cloud[(n_beams-1)*3+0];
     //Array which contains lineś parameters
     double L[(n_donuts-2)*5];
-    //Declare parameters from Donut_1 to Donut_n-2
+    //Declare parameters from Donut_2 to Donut_n-1. Ya que para la supresión solo
+    //se necesita los parametros de la Donut anterior y no necesitamos el de la
+    //última Donut
     for (int i = 1; i < n_donuts-1; i++)
     {
         //Hallamos dos puntos de la recta proyectada en el plano XY
@@ -220,7 +222,7 @@ void Supress_redundant_data(double* Point_Cloud){
         //Guardamos el valor de la pendiente hallada
         L[(i-1)*5+4]=m;
     }
-    //Supress redundant data only for Donut 1
+    //Supress redundant data only for Donut 2
     int i=1;
     for (unsigned int j = 0; j < n_points_perDonut; j++){
         //Calculamos si la coordenada del punto x

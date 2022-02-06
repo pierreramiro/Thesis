@@ -9,19 +9,6 @@
 #define MPI_2 1.57079632679489661923
 #endif
 #define D180_MPI 0.017453293 //: Degrees180/pi
-
-#define TEST_CUDA 1
-#if TEST_CUDA==1
-#define threadsPerBlock 1024
-#define numBlocks 1
-//CUDA libraries
-#include "cuda_runtime.h"
-#include "device_launch_parameters.h"
-#ifndef __CUDACC__  
-	#define __CUDACC__
-	#include <device_functions.h>
-#endif
-#endif
 /*----------------------------------------------------------------------------*/
 /**
  * Definimos los parámetros del LIDAR
@@ -51,6 +38,20 @@ double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos
 #define TriDonutFill_triangles          360
 #define MidDonutFill_triangles          2793
 #define n_total_triangles (OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles+MidDonutFill_triangles)
+
+//CUDA libraries
+#define TEST_CUDA 1
+#if TEST_CUDA==1
+#define threadsPerBlock 1024
+#define numBlocks (n_AZBLK/1024)
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#ifndef __CUDACC__  
+	#define __CUDACC__
+	#include <device_functions.h>
+#endif
+#endif
+
 /*----------------------------------------------------------------------------*/
 /**
  * Funciones de conversión
@@ -963,15 +964,91 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_
     free(T_temp);   
 }
 /*----------------------------------------------------------------------------*/
+#if TEST_CUDA ==1
+/**
+ * \brief multmatrix. function multiplica matrices para ser usado dentro del GPU 
+ */
+__device__ void multmatrix_dev(double* A,unsigned int m,unsigned int n,double*B,unsigned int l,double*C) {
+    for (unsigned int i = 0; i < l;i++) {
+        for (unsigned int j = 0; j < m; j++) {
+            C[j*l+i]=0;
+            for (unsigned int k = 0; k < n; k++) {
+                C[j * l +i] += A[j*n+k]*B[k*l + i];
+            }
+        }
+    }
+}
+
 /**
  * \brief GenerateSphereCUDA. genera esfera 
  */
-
-__global__ void GenerateSphereCUDA(unsigned int* T, unsigned char* g_idata, int n){
+__global__ void GenerateSphereCUDA(double* Point_Cloud){
     //Obtenemos el ID del thread
     int thid = threadIdx.x + blockIdx.x * blockDim.x;
-	if (thid<16){
-        
+	//Generamos el primer azimuth 
+    if (thid<n_beams){
+        //ubicamos el punto del azimut referencial en el plano XZ
+        Point_Cloud[3 * thid + 0] = Radius_sphere* cos(beam_altitude_angles[i] - MPI_2); //x
+        Point_Cloud[3 * thid + 1] = 0;                                         //y
+        Point_Cloud[3 * thid + 2] = Radius_sphere * sin(beam_altitude_angles[i] - MPI_2);//z
+        //Realizamos la rotacion del punto con respecto al eje x debido al desfase
+        rot_x_axis(&Point_Cloud[3*i],beam_azimuth_angles[i]);
+        /*Creamos los azimuts que inician en cada sector*/
+        /*mirror points from quarter Donut*/
+        Point_Cloud[(thid + n_AZBLK / 4 * n_beams)*3+0] = Point_Cloud[3 * thid + 0];
+        Point_Cloud[(thid+ n_AZBLK / 4 * n_beams)*3+1] = Point_Cloud[3 * thid + 2];
+        Point_Cloud[(thid + n_AZBLK / 4 * n_beams)*3+2] = -Point_Cloud[3 * thid + 1];
+        /*mirror points from midle Donut*/
+        Point_Cloud[(thid + n_AZBLK / 2 * n_beams)*3+0] = Point_Cloud[3 * thid + 0];
+        Point_Cloud[(thid + n_AZBLK / 2 * n_beams)*3+1] = -Point_Cloud[3 * thid + 1];
+        Point_Cloud[(thid + n_AZBLK / 2 * n_beams)*3+2] = -Point_Cloud[3 * thid + 2];
+        /*mirror points from 3 quater Donut*/
+        Point_Cloud[(thid + n_AZBLK * 3 / 4 * n_beams)*3 +0] = Point_Cloud[3 * thid + 0];
+        Point_Cloud[(thid + n_AZBLK * 3 / 4 * n_beams)*3 +1] = -Point_Cloud[3 * thid + 2];
+        Point_Cloud[(thid + n_AZBLK * 3 / 4 * n_beams)*3 +2] = Point_Cloud[3 * thid + 1];
+    }
+    __syncthreads();
+    /*Definimos la matrix de rotación para los azimuth*/
+    double rot_matrix[9] = { 1,0,0,0,cos(angle_between_azimuths),-sin(angle_between_azimuths),0,sin(angle_between_azimuths),cos(angle_between_azimuths) };
+    /*Procedemos a realizar el barrido de cada sector para obtener la donnut referencial*/
+    double XYZ[3],temp[9];
+    if(thid<threadsPerBlock/4){
+        for (int j = 0; j < n_beams;j++) {
+            //Calculate previous point
+            XYZ[0] = Point_Cloud[((thid - 1) * n_beams + j)*3 + 0];
+            XYZ[1] = Point_Cloud[((thid - 1) * n_beams + j)*3 + 1];
+            XYZ[2] = Point_Cloud[((thid - 1) * n_beams + j)*3 + 2];
+            //rotate that point
+            mult_matrix_dev (rot_matrix,3,3,XYZ,1,temp);
+            //Set the new azimuth
+            Point_Cloud[(thid * n_beams + j)*3 + 0] = temp[0];
+            Point_Cloud[(thid * n_beams + j)*3 + 1] = temp[1];
+            Point_Cloud[(thid * n_beams + j)*3 + 2] = temp[2];
+            //mirror from quarter Donunt
+            Point_Cloud[((thid + n_AZBLK / 4) * n_beams + j)*3 + 0] = temp[0];
+            Point_Cloud[((thid + n_AZBLK / 4) * n_beams + j)*3 + 1] = temp[2];
+            Point_Cloud[((thid + n_AZBLK / 4) * n_beams + j)*3 + 2] = -temp[1];
+            //mirror points from midle Donut
+            Point_Cloud[((thid + n_AZBLK / 2) * n_beams + j)*3+0] = temp[0];
+            Point_Cloud[((thid + n_AZBLK / 2) * n_beams + j)*3+1] = -temp[1];
+            Point_Cloud[((thid + n_AZBLK / 2) * n_beams + j)*3+2] = -temp[2];
+            //mirror points from midle Donut
+            Point_Cloud[((thid + n_AZBLK * 3 / 4) * n_beams + j)*3 + 0] = temp[0];
+            Point_Cloud[((thid + n_AZBLK * 3 / 4) * n_beams + j)*3 + 1] = -temp[2];
+            Point_Cloud[((thid + n_AZBLK * 3 / 4) * n_beams + j)*3 + 2] = temp[1];
+        }
+    }
+    __syncthreads();
+    //Procedemos a rotar la Donut generada
+    double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos(rot_angle) ,0,0,0,1 };
+    for (unsigned int i = 1; i < n_donuts; i++) {
+        //multiplicamos a todos los n_point_perdonut anteriores con la matriz de rotación
+        for(int j=0;j<n_beams;j++){
+            mult_matrix_dev(rot_motor_matrix, 3, 3, &Point_Cloud[((i - 1) * n_points_perDonut + thid*n_beams+j) * 3], 1, temp);
+            Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 0] = temp[0];
+            Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 1] = temp[1];
+            Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 2] = temp[2];        
+        }
     }
     __syncthreads();
 }
@@ -980,16 +1057,22 @@ __global__ void GenerateSphereCUDA(unsigned int* T, unsigned char* g_idata, int 
  * \brief SupressOverlapCUDA. funcion en paralelo 
  */
 
-__global__ void SupressOverlapCUDA(unsigned int* T, unsigned char* g_idata, int n){}
+__device__ double eq_line_dev(double m,double x,double xb,double yb) {
+    double y= m*(x-xb)+yb;
+    return y;
+}
+/**
+ * \brief SupressOverlapCUDA. funcion en paralelo 
+ */
 
+__global__ void SupressOverlapCUDA(double* Point_Cloud){}
 
 /**
  * \brief OneDonutFillCUDA. First Mesh 
  */
 
-__global__ void OneDonutFillCUDA(unsigned int* T, unsigned char* g_idata, int n){}
-
-
+__global__ void OneDonutFillCUDA(double* Point_Cloud,unsigned int* T){}
+#endif
 /*----------------------------------------------------------------------------*/
 int main()
 {

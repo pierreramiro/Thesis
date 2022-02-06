@@ -30,7 +30,7 @@ double beam_azimuth_angles[n_beams] = { -1.24*D180_MPI, -1.2145*D180_MPI, -1.188
 /*Creamos la matrix de rotación del eje del motor (eje Z)*/
 double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos(rot_angle) ,0,0,0,1 };
 /*Cantidad de Donuts en función del ángulo de rotación*/
-#define n_donuts (unsigned int) ceil(-MPI/rot_angle)
+#define n_donuts 6//(unsigned int) ceil(-MPI/rot_angle)
 #define n_total_points (unsigned int)(n_donuts*n_points_perDonut)
 /*Cantidad de triángulos*/
 #define OneDonutFill_triangles          108226

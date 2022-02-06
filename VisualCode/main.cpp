@@ -968,35 +968,35 @@ int main()
     /*Escribimos la data obtenida en un archivo csv*/
     FILE* archivo;
     /*Creamos el csv de la esfera sin traslape*/
-    archivo = fopen("Sphere_cloud.csv", "w+");
+    archivo = fopen("files/Sphere_cloud.csv", "w+");
     fprintf(archivo, "X, Y, Z\n");
     for (unsigned int i=0; i < n_total_points; i++) {
         fprintf(archivo,"%.4f, %.4f, %.4f\n", Point_Cloud[i*3+0], Point_Cloud[i * 3 + 1], Point_Cloud[i * 3 + 2]);
     }
     fclose(archivo);
     /*Creamos el csv del mesh del OneDonutfill*/
-    archivo = fopen("One_donut_fill.csv", "w+");
+    archivo = fopen("files/One_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < OneDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_ODF[i*3+0], T_ODF[i * 3 + 1], T_ODF[i * 3 + 2]);
     }
     fclose(archivo);
     /*Creamos el csv del mesh del TwoDonutfill*/
-    archivo = fopen("Two_donut_fill.csv", "w+");
+    archivo = fopen("files/Two_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < TwoDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_TwoDF[i*3+0], T_TwoDF[i * 3 + 1], T_TwoDF[i * 3 + 2]);
     }
     fclose(archivo);
     /*Creamos el csv del mesh del TriDonutfill*/
-    archivo = fopen("Tri_donut_fill.csv", "w+");
+    archivo = fopen("files/Tri_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < TriDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_TriDF[i*3+0], T_TriDF[i * 3 + 1], T_TriDF[i * 3 + 2]);
     }
     fclose(archivo);
     /*Creamos el csv del mesh del MidDonutfill*/
-    archivo = fopen("Mid_donut_fill.csv", "w+");
+    archivo = fopen("files/Mid_donut_fill.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < MidDonutFill_triangles; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_MidDF[i*3+0], T_MidDF[i * 3 + 1], T_MidDF[i * 3 + 2]);
@@ -1010,7 +1010,7 @@ int main()
     /**************Integramos las funciones***************/
     /*****************************************************/
     //Leemos del csv los datos reales
-    archivo = fopen("MinaData.csv", "r");
+    archivo = fopen("files/MinaData.csv", "r");
     char buffer[200];
     char* token;
     //Saltamos la primera línea
@@ -1041,7 +1041,7 @@ int main()
 	finishCPU = clock();
 	printf("CPU: %fms\n", (double)(finishCPU - startCPU) / 1000 / 100);/// CLK_TCK);
 	//Creamos el archivo csv
-    archivo = fopen("MinaTriangleMesh.csv", "w+");
+    archivo = fopen("files/MinaTriangleMesh.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < n_triangles_real_data; i++) {
         fprintf(archivo,"%d, %d, %d\n", T[i*3+0], T[i * 3 + 1], T[i * 3 + 2]);
@@ -1051,7 +1051,7 @@ int main()
 	//----------Generate the DXF file-----------
 	//------------------------------------------
 	//Open the DXF file
-    archivo = fopen("MinaSurface.dxf", "w");
+    archivo = fopen("files/MinaSurface.dxf", "w");
     //assert(archivo);
     //header
     fprintf(archivo, "0\nSECTION\n2\nENTITIES\n0\n");

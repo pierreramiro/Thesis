@@ -446,7 +446,7 @@ void side2sideFill( unsigned int vL0_init,unsigned int vL1_init,
                     int pasoL0,int pasoL1,
                     unsigned int* T,unsigned int* n_triangles_pointer)
 {
-    unsigned int vmax,vmin,v0,v1,v2,v1_fin,v_temp;//v2_fin
+    unsigned int vmax,vmin,v0,v1,v2,v1_fin,v_temp,v2_fin;
     int freepointsL0,freepointsL1,pasov1,pasov2,arista_mismo_vex;
     //Realizamos algunos ajustes para poder obterner el valor magnitud de
     //los puntos libres tanto para la izquierda y derecha
@@ -576,7 +576,7 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
     //Variables para operar con los vértices
     unsigned int v0,v1,v2,v_temp,v_corner,v_corner_fin,v_init,v_fin;
     //Variables para operar con los vertices en el TriDonutFill
-    unsigned int v0_mid,v1_mid,v2_mid,T_mid[3],v0_lim,v1_lim,v2_lim,index;//new_v_init;
+    unsigned int v0_mid,v1_mid,v2_mid,T_mid[3],v0_lim,v1_lim,index;//v2_lim,new_v_init;
     int paso_mid,freepoints_mid;
     unsigned int a,b,c;
     //Variables para el middlefill
@@ -983,6 +983,8 @@ __device__ void mult_matrix_dev(double* A,unsigned int m,unsigned int n,double*B
  * \brief GenerateSphereCUDA. genera esfera 
  */
 __global__ void GenerateSphereCUDA(double* Point_Cloud){
+    double beam_altitude_angles[n_beams]= {15.379*D180_MPI,13.236*D180_MPI,11.128*D180_MPI,9.03*D180_MPI,6.941*D180_MPI,4.878*D180_MPI,2.788*D180_MPI,0.705*D180_MPI,-1.454*D180_MPI,-3.448*D180_MPI,-5.518*D180_MPI,-7.601*D180_MPI,-9.697*D180_MPI,-11.789*D180_MPI,-13.914*D180_MPI,-16.062*D180_MPI};
+    double beam_azimuth_angles[n_beams] = { -1.24*D180_MPI, -1.2145*D180_MPI, -1.1889*D180_MPI, -1.1634*D180_MPI, -1.1379*D180_MPI, -1.1123*D180_MPI, -1.0868*D180_MPI, -1.0613*D180_MPI, -1.0357*D180_MPI, -1.0102*D180_MPI, -0.98467*D180_MPI, -0.95913*D180_MPI, -0.9336*D180_MPI, -0.90807*D180_MPI, -0.88253*D180_MPI, -0.857*D180_MPI };
     //Obtenemos el ID del thread
     int thid = threadIdx.x + blockIdx.x * blockDim.x;
 	//Generamos el primer azimuth 
@@ -992,7 +994,7 @@ __global__ void GenerateSphereCUDA(double* Point_Cloud){
         Point_Cloud[3 * thid + 1] = 0;                                         //y
         Point_Cloud[3 * thid + 2] = Radius_sphere * sin(beam_altitude_angles[thid] - MPI_2);//z
         //Realizamos la rotacion del punto con respecto al eje x debido al desfase
-        rot_x_axis(&Point_Cloud[3*i],beam_azimuth_angles[i]);
+        rot_x_axis(&Point_Cloud[3*thid],beam_azimuth_angles[thid]);
         /*Creamos los azimuts que inician en cada sector*/
         /*mirror points from quarter Donut*/
         Point_Cloud[(thid + n_AZBLK / 4 * n_beams)*3+0] = Point_Cloud[3 * thid + 0];

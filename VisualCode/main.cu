@@ -446,7 +446,7 @@ void side2sideFill( unsigned int vL0_init,unsigned int vL1_init,
                     int pasoL0,int pasoL1,
                     unsigned int* T,unsigned int* n_triangles_pointer)
 {
-    unsigned int vmax,vmin,v0,v1,v2,v1_fin,v_temp,v2_fin;
+    unsigned int vmax,vmin,v0,v1,v2,v1_fin,v_temp;//,v2_fin;
     int freepointsL0,freepointsL1,pasov1,pasov2,arista_mismo_vex;
     //Realizamos algunos ajustes para poder obterner el valor magnitud de
     //los puntos libres tanto para la izquierda y derecha
@@ -474,7 +474,7 @@ void side2sideFill( unsigned int vL0_init,unsigned int vL1_init,
     //considero que "v2 es de L0" y "v1 es de L1"
     v2=vL0_init;
     v1=vL1_init;
-    v2_fin=vL0_fin;
+    //v2_fin=vL0_fin;
     v1_fin=vL1_fin;
     pasov2=pasoL0;
     pasov1=pasoL1;

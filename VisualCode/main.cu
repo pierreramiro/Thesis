@@ -10,6 +10,18 @@
 #endif
 #define D180_MPI 0.017453293 //: Degrees180/pi
 
+#define TEST_CUDA 1
+#if TEST_CUDA==1
+#define threadsPerBlock 1024
+#define numBlocks 1
+//CUDA libraries
+#include "cuda_runtime.h"
+#include "device_launch_parameters.h"
+#ifndef __CUDACC__  
+	#define __CUDACC__
+	#include <device_functions.h>
+#endif
+#endif
 /*----------------------------------------------------------------------------*/
 /**
  * Definimos los parámetros del LIDAR
@@ -951,7 +963,34 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_
     free(T_temp);   
 }
 /*----------------------------------------------------------------------------*/
+/**
+ * \brief GenerateSphereCUDA. genera esfera 
+ */
 
+__global__ void GenerateSphereCUDA(unsigned int* T, unsigned char* g_idata, int n){
+    //Obtenemos el ID del thread
+    int thid = threadIdx.x + blockIdx.x * blockDim.x;
+	if (thid<16){
+        
+    }
+    __syncthreads();
+}
+
+/**
+ * \brief SupressOverlapCUDA. funcion en paralelo 
+ */
+
+__global__ void SupressOverlapCUDA(unsigned int* T, unsigned char* g_idata, int n){}
+
+
+/**
+ * \brief OneDonutFillCUDA. First Mesh 
+ */
+
+__global__ void OneDonutFillCUDA(unsigned int* T, unsigned char* g_idata, int n){}
+
+
+/*----------------------------------------------------------------------------*/
 int main()
 {
      /*Allocate memory*/
@@ -1088,6 +1127,13 @@ int main()
     //Finalmente, liberamos el resto de memoria
     free(Point_Cloud);
     free(T);   
+    /*****************************************************/
+    /********************       GPU     ******************/
+    /*****************************************************/
+    #if TEST_CUDA==1
+
+
+    #endif
 #endif 
     return 0;
 }

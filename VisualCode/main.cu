@@ -1142,7 +1142,7 @@ __global__ void SupressOverlapCUDA(double* Point_Cloud){
                 left_side=true;
             }
             //Calculamos el valor de y_temp el cual limitará la zona
-            y_temp=eq_line(L[(i-2)*5+4],x,L[(i-2)*5+left_side*2],L[(i-2)*5+left_side*2+1]);
+            y_temp=eq_line_dev(L[(i-2)*5+4],x,L[(i-2)*5+left_side*2],L[(i-2)*5+left_side*2+1]);
             //Le colocamos un signo negativo, o no, para poder realizar un único condicional para ambos casos
             y_temp=y_temp*(1.0-2*left_side);
             y=y*(1.0-2*left_side);

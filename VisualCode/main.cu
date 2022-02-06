@@ -40,8 +40,6 @@ double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos
 #define n_total_triangles (OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles+MidDonutFill_triangles)
 
 //CUDA libraries
-#define TEST_CUDA 1
-#if TEST_CUDA==1
 #define threadsPerBlock 1024
 #define numBlocks (n_AZBLK/1024)
 #include "cuda_runtime.h"
@@ -49,7 +47,6 @@ double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos
 #ifndef __CUDACC__  
 	#define __CUDACC__
 	#include <device_functions.h>
-#endif
 #endif
 
 /*----------------------------------------------------------------------------*/
@@ -964,7 +961,6 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_
     free(T_temp);   
 }
 /*----------------------------------------------------------------------------*/
-#if TEST_CUDA ==1
 /**
  * \brief multmatrix. function multiplica matrices para ser usado dentro del GPU 
  */
@@ -1183,7 +1179,8 @@ __global__ void OneDonutFillCUDA(double* Point_Cloud,unsigned int* T){
     __syncthreads();
     //En base a la malla referencial hallamos las demás superficies
     double xp,yp,zp;
-    unsigned int offset,temp_vex,count=0,n_triangles_perDonut=n_AZBLK*2*(n_beams-1);
+    unsigned int offset,temp_vex,n_triangles_perDonut=n_AZBLK*2*(n_beams-1);
+    __shared__ unsigned int count=0;
     for (unsigned int i = 1; i < n_donuts; i++){
         //Analizamos cada vertice del tríangulo
         for (unsigned int j = 0; j < n_beams; j++){
@@ -1220,70 +1217,19 @@ __global__ void OneDonutFillCUDA(double* Point_Cloud,unsigned int* T){
         }
     }
 }
-#endif
+
+
+
 /*----------------------------------------------------------------------------*/
 int main()
 {
-     /*Allocate memory*/
+     /*Allocate memory CPU*/
     double* Point_Cloud;
     Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
-    FILE* archivo;
+    unsigned int *T,n_triangles_real_data;
+    T=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
     
- #define FOR_TESTING 0
- #if FOR_TESTING==1
-    unsigned int *T_ODF, *T_TwoDF,*T_TriDF,*T_MidDF;
-    T_ODF=(unsigned int*)malloc(OneDonutFill_triangles*3*sizeof(unsigned int));
-    T_TwoDF=(unsigned int*)malloc(TwoDonutFill_triangles*3*sizeof(unsigned int));
-    T_TriDF=(unsigned int*)malloc(TriDonutFill_triangles*3*sizeof(unsigned int));
-    T_MidDF=(unsigned int*)malloc(MidDonutFill_triangles*3*sizeof(unsigned int));
-    Generate_sphere(Point_Cloud);
-    Supress_redundant_data(Point_Cloud);
-    One_Donut_Fill(Point_Cloud,T_ODF);
-    TwoandTri_Donut_Fill(Point_Cloud,T_TwoDF,T_TriDF,T_MidDF);
-    /*Escribimos la data obtenida en un archivo csv*/
-    /*Creamos el csv de la esfera sin traslape*/
-    archivo = fopen("files/Sphere_cloud.csv", "w+");
-    fprintf(archivo, "X, Y, Z\n");
-    for (unsigned int i=0; i < n_total_points; i++) {
-        fprintf(archivo,"%.4f, %.4f, %.4f\n", Point_Cloud[i*3+0], Point_Cloud[i * 3 + 1], Point_Cloud[i * 3 + 2]);
-    }
-    fclose(archivo);
-    /*Creamos el csv del mesh del OneDonutfill*/
-    archivo = fopen("files/One_donut_fill.csv", "w+");
-    fprintf(archivo, "V1, V2, V3\n");
-    for (unsigned int i=0; i < OneDonutFill_triangles; i++) {
-        fprintf(archivo,"%d, %d, %d\n", T_ODF[i*3+0], T_ODF[i * 3 + 1], T_ODF[i * 3 + 2]);
-    }
-    fclose(archivo);
-    /*Creamos el csv del mesh del TwoDonutfill*/
-    archivo = fopen("files/Two_donut_fill.csv", "w+");
-    fprintf(archivo, "V1, V2, V3\n");
-    for (unsigned int i=0; i < TwoDonutFill_triangles; i++) {
-        fprintf(archivo,"%d, %d, %d\n", T_TwoDF[i*3+0], T_TwoDF[i * 3 + 1], T_TwoDF[i * 3 + 2]);
-    }
-    fclose(archivo);
-    /*Creamos el csv del mesh del TriDonutfill*/
-    archivo = fopen("files/Tri_donut_fill.csv", "w+");
-    fprintf(archivo, "V1, V2, V3\n");
-    for (unsigned int i=0; i < TriDonutFill_triangles; i++) {
-        fprintf(archivo,"%d, %d, %d\n", T_TriDF[i*3+0], T_TriDF[i * 3 + 1], T_TriDF[i * 3 + 2]);
-    }
-    fclose(archivo);
-    /*Creamos el csv del mesh del MidDonutfill*/
-    archivo = fopen("files/Mid_donut_fill.csv", "w+");
-    fprintf(archivo, "V1, V2, V3\n");
-    for (unsigned int i=0; i < MidDonutFill_triangles; i++) {
-        fprintf(archivo,"%d, %d, %d\n", T_MidDF[i*3+0], T_MidDF[i * 3 + 1], T_MidDF[i * 3 + 2]);
-    }
-    fclose(archivo);
-    free(T_ODF);
-    free(T_TwoDF);
-    free(T_TriDF);
-    free(T_MidDF);
-#else
-    /*****************************************************/
-    /********************       CPU     ******************/
-    /*****************************************************/
+    FILE* archivo;
     //Leemos del csv los datos reales
     archivo = fopen("files/MinaData.csv", "r");
     char buffer[200];
@@ -1300,20 +1246,17 @@ int main()
         Point_Cloud[i*3+2]=atof(token);
     }    
     fclose(archivo);    
-    //Obtenemos la reconstruccion
-    unsigned int *T,n_triangles_real_data;
-    T=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
     //evaluamos tiempo
-    clock_t startCPU;
-	clock_t finishCPU;
-	printf("\nTiempo de ejecucion en CPU:\n");
-	startCPU = clock();
+    clock_t start;
+	clock_t finish;
+	printf("\nTiempo de ejecucion:\n");
+	start = clock();
     for (int i=0;i<500;i++){
-        Generate_surface(Point_Cloud,T,&n_triangles_real_data);
+        Generate_surfaceGPU(Point_Cloud,T,&n_triangles_real_data);
     }
-	finishCPU = clock();
+	finish = clock();
 	printf("nro. triangulos: %d\n",n_triangles_real_data);
-    printf("CPU: %fms\n", ((double)(finishCPU - startCPU))/(double)CLOCKS_PER_SEC);
+    printf("CPU: %fms\n", ((double)(finish - start))/(double)CLOCKS_PER_SEC);
 	//Creamos el archivo csv para guardar el resultado
     archivo = fopen("files/MinaTriangleMesh.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
@@ -1325,7 +1268,7 @@ int main()
 	//----------Generate the DXF file-----------
 	//------------------------------------------
 	//Open the DXF file
-    archivo = fopen("files/MinaSurface.dxf", "w");
+    archivo = fopen("files/MinaSurfaceGPU.dxf", "w");
     //assert(archivo);
     //header
     fprintf(archivo, "0\nSECTION\n2\nENTITIES\n0\n");
@@ -1358,13 +1301,5 @@ int main()
     //Finalmente, liberamos el resto de memoria
     free(Point_Cloud);
     free(T);   
-    /*****************************************************/
-    /********************       GPU     ******************/
-    /*****************************************************/
-    #if TEST_CUDA==1
-
-
-    #endif
-#endif 
     return 0;
 }

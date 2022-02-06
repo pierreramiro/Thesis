@@ -1179,7 +1179,7 @@ __global__ void OneDonutFillCUDA(double* Point_Cloud,unsigned int* T){
     __syncthreads();
     //En base a la malla referencial hallamos las demás superficies
     double xp,yp,zp;
-    unsigned int offset,temp_vex,n_triangles_perDonut=n_AZBLK*2*(n_beams-1);
+    unsigned int count,offset,temp_vex,n_triangles_perDonut=n_AZBLK*2*(n_beams-1);
     for (unsigned int i = 1; i < n_donuts; i++){
         //Analizamos cada vertice del tríangulo
         for (unsigned int j = 0; j < n_beams; j++){

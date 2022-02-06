@@ -978,7 +978,13 @@ __device__ void mult_matrix_dev(double* A,unsigned int m,unsigned int n,double*B
         }
     }
 }
-
+__device__ void rot_x_axis_dev(double* XYZ_points,double angle ){
+    double temp[3], rot_matrix[9] = { 1,0,0,0,cos(angle),-sin(angle),0,sin(angle),cos(angle) };
+    temp[0]=XYZ_points[0];
+    temp[1]=XYZ_points[1];
+    temp[2]=XYZ_points[2];
+    mult_matrix_dev(rot_matrix, 3, 3, temp, 1, XYZ_points);
+}
 /**
  * \brief GenerateSphereCUDA. genera esfera 
  */
@@ -994,7 +1000,7 @@ __global__ void GenerateSphereCUDA(double* Point_Cloud){
         Point_Cloud[3 * thid + 1] = 0;                                         //y
         Point_Cloud[3 * thid + 2] = Radius_sphere * sin(beam_altitude_angles[thid] - MPI_2);//z
         //Realizamos la rotacion del punto con respecto al eje x debido al desfase
-        rot_x_axis(&Point_Cloud[3*thid],beam_azimuth_angles[thid]);
+        rot_x_axis_dev(&Point_Cloud[3*thid],beam_azimuth_angles[thid]);
         /*Creamos los azimuts que inician en cada sector*/
         /*mirror points from quarter Donut*/
         Point_Cloud[(thid + n_AZBLK / 4 * n_beams)*3+0] = Point_Cloud[3 * thid + 0];

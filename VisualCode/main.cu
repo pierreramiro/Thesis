@@ -209,7 +209,7 @@ double eq_line(double m,double x,double xb,double yb) {
  */
 void Supress_redundant_data(double* Point_Cloud){
     //Declare tomporary variables
-    double x,y,y_temp,x1,y1,xn,yn,m;
+    double x,y,y_temp,x1,y1,m;//xn,yn
     //Set vertical limits
     double X_L1=Point_Cloud[0],X_Ln=Point_Cloud[(n_beams-1)*3+0];
     //Array which contains lineś parameters
@@ -446,7 +446,7 @@ void side2sideFill( unsigned int vL0_init,unsigned int vL1_init,
                     int pasoL0,int pasoL1,
                     unsigned int* T,unsigned int* n_triangles_pointer)
 {
-    unsigned int vmax,vmin,v0,v1,v2,v1_fin,v2_fin,v_temp;
+    unsigned int vmax,vmin,v0,v1,v2,v1_fin,v_temp;//v2_fin
     int freepointsL0,freepointsL1,pasov1,pasov2,arista_mismo_vex;
     //Realizamos algunos ajustes para poder obterner el valor magnitud de
     //los puntos libres tanto para la izquierda y derecha
@@ -576,9 +576,9 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
     //Variables para operar con los vértices
     unsigned int v0,v1,v2,v_temp,v_corner,v_corner_fin,v_init,v_fin;
     //Variables para operar con los vertices en el TriDonutFill
-    unsigned int v0_mid,v1_mid,v2_mid,T_mid[3],v0_lim,v1_lim,v2_lim,index,new_v_init;
+    unsigned int v0_mid,v1_mid,v2_mid,T_mid[3],v0_lim,v1_lim,v2_lim,index;//new_v_init;
     int paso_mid,freepoints_mid;
-    unsigned int a,b,c,d;
+    unsigned int a,b,c;
     //Variables para el middlefill
     unsigned int vrigth_init,vrigth_fin,vleft_init,vleft_fin;
     int pasoRigth,pasoLeft;
@@ -968,7 +968,7 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_
 /**
  * \brief multmatrix. function multiplica matrices para ser usado dentro del GPU 
  */
-__device__ void multmatrix_dev(double* A,unsigned int m,unsigned int n,double*B,unsigned int l,double*C) {
+__device__ void mult_matrix_dev(double* A,unsigned int m,unsigned int n,double*B,unsigned int l,double*C) {
     for (unsigned int i = 0; i < l;i++) {
         for (unsigned int j = 0; j < m; j++) {
             C[j*l+i]=0;
@@ -988,9 +988,9 @@ __global__ void GenerateSphereCUDA(double* Point_Cloud){
 	//Generamos el primer azimuth 
     if (thid<n_beams){
         //ubicamos el punto del azimut referencial en el plano XZ
-        Point_Cloud[3 * thid + 0] = Radius_sphere* cos(beam_altitude_angles[i] - MPI_2); //x
+        Point_Cloud[3 * thid + 0] = Radius_sphere* cos(beam_altitude_angles[thid] - MPI_2); //x
         Point_Cloud[3 * thid + 1] = 0;                                         //y
-        Point_Cloud[3 * thid + 2] = Radius_sphere * sin(beam_altitude_angles[i] - MPI_2);//z
+        Point_Cloud[3 * thid + 2] = Radius_sphere * sin(beam_altitude_angles[thid] - MPI_2);//z
         //Realizamos la rotacion del punto con respecto al eje x debido al desfase
         rot_x_axis(&Point_Cloud[3*i],beam_azimuth_angles[i]);
         /*Creamos los azimuts que inician en cada sector*/

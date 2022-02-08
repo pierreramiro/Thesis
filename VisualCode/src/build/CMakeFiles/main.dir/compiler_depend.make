@@ -164,7 +164,8 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
   /usr/lib/gcc/x86_64-linux-gnu/7/include/stdint.h \
   /usr/include/stdint.h \
   /usr/include/x86_64-linux-gnu/bits/wchar.h \
-  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h
+  /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h \
+  ../ouster_reconstruction.h
 
 
 /usr/include/x86_64-linux-gnu/bits/stdint-uintn.h:
@@ -238,6 +239,8 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h:
 
 /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h:
+
+../ouster_reconstruction.h:
 
 /usr/include/x86_64-linux-gnu/bits/uintn-identity.h:
 

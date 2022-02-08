@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include "ouster_reconstruction.h"
 //CUDA libraries
-#define threadsPerBlock 1024
-#define numBlocks (n_AZBLK/1024)
+#define threadsPerBlock 256
+#define numBlocks (1024/threadsPerBlock) //(n_AZBLK/1024)
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #ifndef __CUDACC__  
@@ -351,14 +351,14 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
     unsigned int *OneDonutMesh_dev,*T_temp_dev,*count_array_dev,n_triangles_perDonut=n_AZBLK*2*(n_beams-1);
     cudaMalloc((void**)(&OneDonutMesh_dev), sizeof(unsigned int) * OneDonutFill_triangles * 3);
     cudaMalloc((void**)(&T_temp_dev), sizeof(unsigned int) * n_triangles_perDonut* (n_donuts-1) * 3);
-    cudaMalloc((void**)(&count_array_dev), sizeof(unsigned int) * threadsPerBlock);
+    cudaMalloc((void**)(&count_array_dev), sizeof(unsigned int) * 1024);
     //3rd step. First part of the ODF
     ODF_part1<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev,OneDonutMesh_dev,T_temp_dev,count_array_dev);
     unsigned int *index_offset_array_dev;
     cudaMalloc((void**)(&index_offset_array_dev), sizeof(unsigned int) * 1024);
     //4th step. eScan GPU
-    cudaDeviceSynchronize();
-    eScanGPU<<<numBlocks, threadsPerBlock/2 >>> (index_offset_array_dev,count_array_dev);
+    cudaDeviceSynchronize();//check: https://developer.nvidia.com/blog/how-overlap-data-transfers-cuda-cc/ 
+    eScanGPU<<<1, 512 >>> (index_offset_array_dev,count_array_dev);//try with CPU. Try with masking. Chapter: toolkit pin-memory. Optimized method. Chapter: asynch transfer
     //5th step. last part ODF
     cudaDeviceSynchronize();
     ODF_part2<<<numBlocks, threadsPerBlock >>> (OneDonutMesh_dev,T_temp_dev,count_array_dev,index_offset_array_dev);
@@ -372,6 +372,7 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
     /////////////////////////////////////////////////////////////////////////////////////////
     //6th step. last Fill
     TwoandTri_Donut_Fill(Sphere_Cloud,&T_temp[OneDonutFill_triangles*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);
+    
     unsigned int temp_vex,n_triangles=0;
     double xp,yp,zp;
     for (unsigned int i = 0; i < n_total_triangles; i++){
@@ -415,10 +416,10 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
 /******************************************************************/
 /*************************       MAIN     *************************/
 /******************************************************************/
-#define TESTING 0
+#define TESTING 1
 int main()
 {
-#if TESTING == 1
+#if TESTING == 0
     #define iter 1000.0
     /*Allocate memory*/
     double* Point_Cloud;
@@ -586,10 +587,10 @@ int main()
     cudaEventRecord(start_gpu);
     for (int z = 0; z < iter; z++)
     SupressOverlapCUDA<<<numBlocks, threadsPerBlock >>> (Point_Cloud_dev);
+    cudaerr=cudaMemcpy(Point_Cloud_gpu, Point_Cloud_dev, sizeof(double) *n_total_points * 3, cudaMemcpyDeviceToHost);
     cudaEventRecord(stop_gpu);
     cudaEventSynchronize(stop_gpu);
 	cudaEventElapsedTime(&timeGPU, start_gpu, stop_gpu);
-    cudaerr=cudaMemcpy(Point_Cloud_gpu, Point_Cloud_dev, sizeof(double) *n_total_points * 3, cudaMemcpyDeviceToHost);
     printf("OR time:  %fms\n\r", timeGPU / iter);
     totalGPU+=timeGPU/iter;
 
@@ -598,7 +599,7 @@ int main()
     
     cudaMalloc((void**)(&OneMesh_dev), sizeof(unsigned int) * n_total_triangles * 3);
     cudaMalloc((void**)(&OneMesh_temp_dev), sizeof(unsigned int) * n_triangles_perDonut* (n_donuts-1) * 3);
-    cudaMalloc((void**)(&count_array_dev), sizeof(unsigned int) * threadsPerBlock);
+    cudaMalloc((void**)(&count_array_dev), sizeof(unsigned int) * 1024);
     cudaMalloc((void**)(&index_offset_array_dev), sizeof(unsigned int) * 1024);
     T_gpu=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
 
@@ -609,17 +610,17 @@ int main()
         ODF_part1<<<numBlocks, threadsPerBlock >>> (Point_Cloud_dev,OneMesh_dev,OneMesh_temp_dev,count_array_dev);
         cudaDeviceSynchronize();
         //4th step. eScan GPU
-        eScanGPU<<<numBlocks, threadsPerBlock/2 >>> (index_offset_array_dev,count_array_dev);
+        eScanGPU<<<1, 1024/2 >>> (index_offset_array_dev,count_array_dev);
         cudaDeviceSynchronize();
         //5th step. last part ODF
         ODF_part2<<<numBlocks, threadsPerBlock >>> (OneMesh_dev,OneMesh_temp_dev,count_array_dev,index_offset_array_dev);
         cudaDeviceSynchronize();
+        cudaerr=cudaMemcpy(T_gpu,OneMesh_dev, sizeof(unsigned int) *OneDonutFill_triangles * 3, cudaMemcpyDeviceToHost);
     
     }
     cudaEventRecord(stop_gpu);
     cudaEventSynchronize(stop_gpu);
 	cudaEventElapsedTime(&timeGPU, start_gpu, stop_gpu);
-    cudaerr=cudaMemcpy(T_gpu,OneMesh_dev, sizeof(unsigned int) *OneDonutFill_triangles * 3, cudaMemcpyDeviceToHost);
     if (cudaerr != 0)	printf("ERROR copying to T_gpu. CudaMalloc value=%i\n\r",cudaerr);
     printf("ODF time:  %fms\n\r", timeGPU / iter);
     totalGPU+=timeGPU/iter;

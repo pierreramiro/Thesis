@@ -1447,7 +1447,7 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
 /******************************************************************/
 /*************************       MAIN     *************************/
 /******************************************************************/
-#define TESTING 1
+#define TESTING 0
 int main()
 {
 #if TESTING == 0
@@ -1457,7 +1457,7 @@ int main()
     Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
     //Leemos del csv los datos reales
     FILE* archivo;
-    archivo = fopen("files/MinaData.csv", "r");
+    archivo = fopen("../files/MinaData.csv", "r");
     char buffer[200];
     char* token;
     //Saltamos la primera línea
@@ -1505,13 +1505,46 @@ int main()
 	printf("numero de triangulos: %d\n",n_triangles_real_data_gpu);
     printf("GPU: %fms\n", ((double)(finishGPU - startGPU))/(double)CLOCKS_PER_SEC);
 	//creamos archivo para ver results
-    archivo = fopen("files/CUDAMesh.csv", "w+");
+    archivo = fopen("../files/CUDAMesh.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
     for (unsigned int i=0; i < n_triangles_real_data_gpu; i++) {
         fprintf(archivo,"%d, %d, %d\n", T_gpu[i*3+0], T_gpu[i * 3 + 1], T_gpu[i * 3 + 2]);
     }
     fclose(archivo);
-   
+    //------------------------------------------
+	//----------Generate the DXF file-----------
+	//------------------------------------------
+	//Open the DXF file
+    archivo = fopen("../files/CUDAMinaSurface.dxf", "w");
+    //assert(archivo);
+    //header
+    fprintf(archivo, "0\nSECTION\n2\nENTITIES\n0\n");
+	float x0,y0,z0,x1,y1,z1,x2,y2,z2;
+	for (int i = 0; i < n_triangles_real_data_gpu; i++)
+    {
+        // get the coordinates of each point from the triangle
+        x0 = Point_Cloud[T_gpu[i* 3+0]*3 + 0];
+        y0 = Point_Cloud[T_gpu[i* 3+0]*3 + 1];
+        z0 = Point_Cloud[T_gpu[i* 3+0]*3 + 2];
+        
+        x1 = Point_Cloud[T_gpu[i* 3+1]*3 + 0];
+        y1 = Point_Cloud[T_gpu[i* 3+1]*3 + 1];
+        z1 = Point_Cloud[T_gpu[i* 3+1]*3 + 2];
+        
+        x2 = Point_Cloud[T_gpu[i* 3+2]*3 + 0];
+        y2 = Point_Cloud[T_gpu[i* 3+2]*3 + 1];
+        z2 = Point_Cloud[T_gpu[i* 3+2]*3 + 2];
+        //create new 3DFACE element
+        fprintf(archivo, "3DFACE\n8\n1\n");
+        fprintf(archivo, " 62\n %d\n", 142);//corresponding color of the autocad pallete
+        fprintf(archivo, "10\n %.4f\n 20\n %.4f\n 30\n %.4f\n", x0, y0, z0);
+        fprintf(archivo, "11\n %.4f\n 21\n %.4f\n 31\n %.4f\n", x1, y1, z1);
+        fprintf(archivo, "12\n %.4f\n 22\n %.4f\n 32\n %.4f\n", x2, y2, z2);
+        fprintf(archivo, "13\n %.4f\n 23\n %.4f\n 33\n %.4f\n", x2, y2, z2);
+        fprintf(archivo, "0\n");
+    }
+    fprintf(archivo, "ENDSEC\n 0\nEOF\n");
+    fclose(archivo);
 
     return 0;
 #else

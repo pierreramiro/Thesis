@@ -169,9 +169,7 @@ int main()
 		}
 	}
 
-
-	printf("\n All DONE, press any key to end");
-
+	printf("\n %f %f %f %f %f\n",outcpu[0],outcpu[1],outcpu[2],outcpu[3],outcpu[4]);
 
     cudaFree(d_src);
     cudaFree(d_dst);

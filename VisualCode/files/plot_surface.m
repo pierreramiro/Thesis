@@ -23,3 +23,10 @@ trimesh(T,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))
 % trimesh(T,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))
 % figure
 % scatter3(Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))
+%%
+clc
+T=[];
+temp=readmatrix("CUDAMesh.csv")+1;
+T=[T;temp];
+Point_Cloud=readmatrix("MinaData.csv");
+trimesh(T,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))

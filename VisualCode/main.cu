@@ -1241,6 +1241,145 @@ __global__ void OneDonutFillCUDA(double* Point_Cloud,unsigned int* T,unsigned in
 }
 
 
+__global__ void ODF_part1(double* Point_Cloud,unsigned int* T,unsigned int* T_per_thread,unsigned int* index_offset){
+    int thid = threadIdx.x + blockIdx.x * blockDim.x;
+    unsigned int v0,v1,v2;
+    //Definimos los vértices
+    //Realizamos la malla triangular para la Donut referencial
+    for (unsigned int j = 0; j < n_beams-1; j++)
+    {   
+        v0=thid*n_beams+j;
+        v2=v0+1;
+        v1=(v0+n_beams+1)&mask;
+        T[thid*(n_beams-1)*3*2+j*6]=v0;
+        T[thid*(n_beams-1)*3*2+j*6+1]=v1;
+        T[thid*(n_beams-1)*3*2+j*6+2]=v2;
+        v2=v1;
+        v1=v2-1;
+        T[thid*(n_beams-1)*3*2+j*6+3]=v0;
+        T[thid*(n_beams-1)*3*2+j*6+4]=v1;
+        T[thid*(n_beams-1)*3*2+j*6+5]=v2;
+    }
+    __syncthreads();
+    //En base a la malla referencial hallamos las demás superficies
+    double xp,yp,zp;
+    unsigned int count=0,offset,temp_vex,n_triangles_perThreadandDonut=2*(n_beams-1);
+    for (unsigned int i = 1; i < n_donuts; i++){
+        //Analizamos cada vertice del tríangulo
+        for (unsigned int j = 0; j < n_triangles_perThreadandDonut; j++){
+             //Analizamos el punto del vertice v0
+            offset=(thid*n_triangles_perThreadandDonut+j)*3;
+            temp_vex=(T[offset]+i*n_points_perDonut);
+            xp=Point_Cloud[temp_vex*3+0];
+            yp=Point_Cloud[temp_vex*3+1];
+            zp=Point_Cloud[temp_vex*3+2];
+            if ((xp!=0)||(yp!=0)||(zp!=0)){
+                //analizamos el punto del vertice v1
+                temp_vex=(T[offset+1]+i*n_points_perDonut);
+                xp=Point_Cloud[temp_vex*3+0];
+                yp=Point_Cloud[temp_vex*3+1];
+                zp=Point_Cloud[temp_vex*3+2];
+                if ((xp!=0)||(yp!=0)||(zp!=0)){
+                    //analizamos el punto del vertice v2
+                    temp_vex=(T[offset+2]+i*n_points_perDonut);
+                    xp=Point_Cloud[temp_vex*3+0];
+                    yp=Point_Cloud[temp_vex*3+1];
+                    zp=Point_Cloud[temp_vex*3+2];
+                    if ((xp!=0)||(yp!=0)||(zp!=0)){
+                        //Si todo lo anterior se cumple, guardamos el triángulo
+                        T_per_thread[(n_donuts-1)*n_triangles_perThreadandDonut*3*thid+count*3+2]=temp_vex;
+                        T_per_thread[(n_donuts-1)*n_triangles_perThreadandDonut*3*thid+count*3+1]=(T[offset+1]+i*n_points_perDonut);
+                        T_per_thread[(n_donuts-1)*n_triangles_perThreadandDonut*3*thid+count*3]=(T[offset]+i*n_points_perDonut);
+                        count++;
+                    }
+                }
+            }
+        }
+    }
+    index_offset[thid]=count;
+    __syncthreads();
+}
+
+#define ngpu 1024
+#define NUM_BANKS 32
+#define LOG_NUM_BANKS 5
+#define CONFLICT_FREE_OFFSET(n) ((n) >> LOG_NUM_BANKS)
+__global__ void eScanGPU(float *g_odata, float *g_idata)
+{
+	__shared__ float temp[2*ngpu];// allocated on invocation
+	int thid = threadIdx.x;
+	int offset = 1,n=ngpu;
+	
+	int ai = thid;
+	int bi = thid + (n/2);
+	int bankOffsetA = CONFLICT_FREE_OFFSET(ai);
+	int bankOffsetB = CONFLICT_FREE_OFFSET(bi);
+	temp[ai + bankOffsetA] = g_idata[ai];
+	temp[bi + bankOffsetB] = g_idata[bi];
+
+//	temp[2*thid] = g_idata[2*thid]; // load input into shared memory
+//	temp[2*thid+1] = g_idata[2*thid+1];
+	
+	for (int d = n>>1; d > 0; d >>= 1) // build sum in place up the tree
+	{
+		__syncthreads();
+		if (thid < d)
+		{
+			int ai = offset*(2*thid+1)-1;
+			int bi = offset*(2*thid+2)-1;
+			ai += CONFLICT_FREE_OFFSET(ai);
+			bi += CONFLICT_FREE_OFFSET(bi);
+//			int ai = offset*(2*thid+1)-1;
+//			int bi = offset*(2*thid+2)-1;
+			temp[bi] += temp[ai];
+		}
+		offset *= 2;
+	}
+	if (thid==0) { temp[n - 1 + CONFLICT_FREE_OFFSET(n - 1)] = 0; }
+	//	if (thid == 0) { temp[n - 1] = 0; } // clear the last element
+	for (int d = 1; d < n; d *= 2) // traverse down tree & build scan
+	{
+		offset >>= 1;
+		__syncthreads();
+		if (thid < d)
+		{
+			int ai = offset*(2*thid+1)-1;
+			int bi = offset*(2*thid+2)-1;
+			ai += CONFLICT_FREE_OFFSET(ai);
+			bi += CONFLICT_FREE_OFFSET(bi);
+//			int ai = offset*(2*thid+1)-1;
+//			int bi = offset*(2*thid+2)-1;
+
+			float t = temp[ai];
+			temp[ai] = temp[bi];
+			temp[bi] += t;
+		}
+	}
+	__syncthreads();
+	g_odata[ai] = temp[ai + bankOffsetA];
+	g_odata[bi] = temp[bi + bankOffsetB];
+//	g_odata[2*thid] = temp[2*thid]; // write results to device memory
+//	g_odata[2*thid+1] = temp[2*thid+1];
+}
+
+
+
+ __global__ void ODF_part2(double* Point_Cloud,unsigned int* T,unsigned int* T_per_thread,unsigned int* count_array,unsigned int* index_offset){
+    int thid = threadIdx.x + blockIdx.x * blockDim.x;   
+    unsigned int count,offset,n_triangles_perDonut=n_AZBLK*2*(n_beams-1),n_triangles_perThreadandDonut=2*(n_beams-1);
+    count=count_array[thid];
+    //Ha este punto, cada hilo contiene una cierta cantidad de n triangulos que han de ser colocadas en el array original
+    offset=index_offset[thid];
+    offset*=3;
+    //copy triangles 
+    for(int z=0;z<count*3;z++){
+        T[n_triangles_perDonut*3+offset+z]=T_per_thread[(n_donuts-1)*n_triangles_perThreadandDonut*3*thid+z];
+    }
+    __syncthreads();
+}
+
+
+
 void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *pointer_n_triangles){
     /////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////      CUDA        ////////////////////////////////////
@@ -1282,15 +1421,26 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
     
     cudaEventRecord(start);
     for (int z = 0; z < iter; z++)
-    OneDonutFillCUDA<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev,OneDonutMesh_dev,index_offset_array_dev);
-    unsigned int *T_temp;
-    T_temp=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
-    cudaerr=cudaMemcpy(T_temp,OneDonutMesh_dev, sizeof(unsigned int) *OneDonutFill_triangles * 3, cudaMemcpyDeviceToHost);
-    if (cudaerr != 0)	printf("ERROR copying to T_temp. CudaMalloc value=%i\n\r",cudaerr);
+    //OneDonutFillCUDA<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev,OneDonutMesh_dev,index_offset_array_dev);
+    ODF_part1<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev,OneDonutMesh_dev,index_offset_array_dev);
     cudaEventRecord(stop);
 	cudaEventSynchronize(stop);
 	cudaEventElapsedTime(&gpu_time, start, stop);
-    printf("ODF time:  %fms\n\r", gpu_time / iter);
+    printf("ODF time1:  %fms\n\r", gpu_time / iter);
+
+    cudaEventRecord(start);
+    for (int z = 0; z < iter; z++)
+    ODF_part2<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev,OneDonutMesh_dev,index_offset_array_dev);
+    unsigned int *T_temp;
+    T_temp=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
+    cudaEventRecord(stop);
+	cudaEventSynchronize(stop);
+	cudaEventElapsedTime(&gpu_time, start, stop);
+    printf("ODF time2:  %fms\n\r", gpu_time / iter);
+    cudaerr=cudaMemcpy(T_temp,OneDonutMesh_dev, sizeof(unsigned int) *OneDonutFill_triangles * 3, cudaMemcpyDeviceToHost);
+    if (cudaerr != 0)	printf("ERROR copying to T_temp. CudaMalloc value=%i\n\r",cudaerr);
+    
+
 	/////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////      CPU        ////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////

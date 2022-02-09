@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "ouster_reconstruction.h"
 //CUDA libraries
-#define threadsPerBlock 256
+#define threadsPerBlock 16  //
 #define numBlocks (1024/threadsPerBlock) //(n_AZBLK/1024)
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -45,7 +45,7 @@ __global__ void GenerateSphereCUDA(double* Point_Cloud){
     double beam_altitude_angles[n_beams]= {15.379*D180_MPI,13.236*D180_MPI,11.128*D180_MPI,9.03*D180_MPI,6.941*D180_MPI,4.878*D180_MPI,2.788*D180_MPI,0.705*D180_MPI,-1.454*D180_MPI,-3.448*D180_MPI,-5.518*D180_MPI,-7.601*D180_MPI,-9.697*D180_MPI,-11.789*D180_MPI,-13.914*D180_MPI,-16.062*D180_MPI};
     double beam_azimuth_angles[n_beams] = { -1.24*D180_MPI, -1.2145*D180_MPI, -1.1889*D180_MPI, -1.1634*D180_MPI, -1.1379*D180_MPI, -1.1123*D180_MPI, -1.0868*D180_MPI, -1.0613*D180_MPI, -1.0357*D180_MPI, -1.0102*D180_MPI, -0.98467*D180_MPI, -0.95913*D180_MPI, -0.9336*D180_MPI, -0.90807*D180_MPI, -0.88253*D180_MPI, -0.857*D180_MPI };
     //Obtenemos el ID del thread
-    int thid = threadIdx.x + blockIdx.x * blockDim.x;
+    int thid = threadIdx.x + blockIdx.x * blockDim.x;//thid value from 0 to 1023
 	//Generamos el primer azimuth 
     if (thid<n_beams){
         //ubicamos el punto del azimut referencial en el plano XZ
@@ -73,7 +73,7 @@ __global__ void GenerateSphereCUDA(double* Point_Cloud){
     /*Procedemos a realizar el barrido de cada sector para obtener la donnut referencial*/
     double temp[3];
     if(thid>0){
-        double rot_matrix[9] = { 1,0,0,0,cos(angle_between_azimuths*thid),-sin(angle_between_azimuths*thid),0,sin(angle_between_azimuths*thid),cos(angle_between_azimuths*thid) };
+        double rot_matrix[9] = { 1,0,0,0,cos(angle_between_azimuths*(double)thid),-sin(angle_between_azimuths*(double)thid),0,sin(angle_between_azimuths*(double)thid),cos(angle_between_azimuths*(double)thid) };
         double XYZ[3];
         for (int j = 0; j < n_beams;j++) {
             //Obtain point from referencial azimuth
@@ -90,11 +90,11 @@ __global__ void GenerateSphereCUDA(double* Point_Cloud){
     }
     __syncthreads();
     //Procedemos a rotar la Donut generada
-    double rot_motor_matrix[9]={ cos(rot_angle),-sin(rot_angle),0,sin(rot_angle),cos(rot_angle) ,0,0,0,1 };
     for (unsigned int i = 1; i < n_donuts; i++) {
-        //multiplicamos a todos los n_point_perdonut anteriores con la matriz de rotación
+        double rot_motor_matrix[9]={ cos(rot_angle*(double)i),-sin(rot_angle*(double)i),0,sin(rot_angle*(double)i),cos(rot_angle*(double)i) ,0,0,0,1 };
+        //multiplicamos a todos los n_point_perdonut de la Donut referencial con la matriz de rotación respectiva
         for(int j=0;j<n_beams;j++){
-            mult_matrix_dev(rot_motor_matrix, 3, 3, &Point_Cloud[((i - 1) * n_points_perDonut + thid*n_beams+j) * 3], 1, temp);
+            mult_matrix_dev(rot_motor_matrix, 3, 3, &Point_Cloud[(thid*n_beams+j) * 3], 1, temp);
             Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 0] = temp[0];
             Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 1] = temp[1];
             Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 2] = temp[2];        
@@ -147,7 +147,6 @@ __global__ void SupressOverlapCUDA(double* Point_Cloud){
             //points_deleted=points_deleted+1;
         }
     }
-    __syncthreads();
     //Supress redundant for the rest of the Donuts
     //Creamos variable booleana para saber la zona del plano en donde se encuentra el punto
     bool left_side;
@@ -212,7 +211,7 @@ __global__ void ODF_part1(double* Point_Cloud,unsigned int* T,unsigned int* T_te
         T[thid*(n_beams-1)*3*2+j*6+4]=v1;
         T[thid*(n_beams-1)*3*2+j*6+5]=v2;
     }
-    __syncthreads();
+    //__syncthreads(); Not necessary
     //En base a la malla referencial hallamos las demás superficies
     double xp,yp,zp;
     unsigned int count=0,offset,temp_vex,n_triangles_perThreadandDonut=2*(n_beams-1);
@@ -340,8 +339,7 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
     double* Sphere_Cloud_dev;
     cudaMalloc((void**)(&Sphere_Cloud_dev), sizeof(double) * n_total_points * 3);
     //1st step. GenerateSphere
-    GenerateSphereCUDA<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev);
-    cudaDeviceSynchronize();
+    GenerateSphereCUDA<<<4, 256 >>> (Sphere_Cloud_dev);
     //2nd step. Overlap removing
     SupressOverlapCUDA<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev);
     double* Sphere_Cloud;
@@ -357,12 +355,9 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
     unsigned int *index_offset_array_dev;
     cudaMalloc((void**)(&index_offset_array_dev), sizeof(unsigned int) * 1024);
     //4th step. eScan GPU
-    cudaDeviceSynchronize();//check: https://developer.nvidia.com/blog/how-overlap-data-transfers-cuda-cc/ 
     eScanGPU<<<1, 512 >>> (index_offset_array_dev,count_array_dev);//try with CPU. Try with masking. Chapter: toolkit pin-memory. Optimized method. Chapter: asynch transfer
     //5th step. last part ODF
-    cudaDeviceSynchronize();
     ODF_part2<<<numBlocks, threadsPerBlock >>> (OneDonutMesh_dev,T_temp_dev,count_array_dev,index_offset_array_dev);
-    cudaDeviceSynchronize();
     unsigned int *T_temp;
     T_temp=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
     cudaerr=cudaMemcpy(T_temp,OneDonutMesh_dev, sizeof(unsigned int) *OneDonutFill_triangles * 3, cudaMemcpyDeviceToHost);
@@ -372,7 +367,13 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
     /////////////////////////////////////////////////////////////////////////////////////////
     //6th step. last Fill
     TwoandTri_Donut_Fill(Sphere_Cloud,&T_temp[OneDonutFill_triangles*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_temp[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);
-    
+    cudaDeviceSynchronize();
+    cudaFree(Sphere_Cloud_dev);
+    cudaFree(OneDonutMesh_dev);
+    cudaFree(T_temp_dev);
+    cudaFree(count_array_dev);
+    cudaFree(index_offset_array_dev);
+   
     unsigned int temp_vex,n_triangles=0;
     double xp,yp,zp;
     for (unsigned int i = 0; i < n_total_triangles; i++){
@@ -404,11 +405,6 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
         }
     }
     pointer_n_triangles[0]=n_triangles; 
-    cudaFree(Sphere_Cloud_dev);
-    cudaFree(OneDonutMesh_dev);
-    cudaFree(T_temp_dev);
-    cudaFree(count_array_dev);
-    cudaFree(index_offset_array_dev);
     free(Sphere_Cloud);
     free(T_temp);
 }
@@ -416,11 +412,11 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,unsigned int *point
 /******************************************************************/
 /*************************       MAIN     *************************/
 /******************************************************************/
-#define TESTING 1
+#define TESTING 0
 int main()
 {
 #if TESTING == 0
-    #define iter 1000.0
+    #define iter 500.0
     /*Allocate memory*/
     double* Point_Cloud;
     Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
@@ -472,7 +468,7 @@ int main()
     }
 	finishGPU = clock();
 	printf("numero de triangulos: %d\n",n_triangles_real_data_gpu);
-    printf("GPU: %fms\n", ((double)(finishGPU - startGPU))/(double)CLOCKS_PER_SEC);
+    printf("GPU: %fms\n", ((double)(finishGPU - startGPU))*1000/(double)CLOCKS_PER_SEC/iter);
 	//creamos archivo para ver results
     archivo = fopen("../files/CUDAMesh.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
@@ -517,7 +513,7 @@ int main()
 
     return 0;
 #else
-    #define iter 1000.0
+    #define iter 100.0
     /*************************************************************************************/
     /***********************************    CPU     **************************************/
     /*************************************************************************************/
@@ -576,18 +572,19 @@ int main()
     printf ("/*********************CPU y GPU********************/\n");
     cudaEventRecord(start_gpu);
     for (int z = 0; z < iter; z++)
-    GenerateSphereCUDA<<<numBlocks, threadsPerBlock >>> (Point_Cloud_dev);
+    GenerateSphereCUDA<<<4, 256 >>> (Point_Cloud_dev);
     cudaEventRecord(stop_gpu);
     cudaEventSynchronize(stop_gpu);
 	cudaEventElapsedTime(&timeGPU, start_gpu, stop_gpu);
     printf("GS time:  %fms\n\r", timeGPU / iter);
     totalGPU+=timeGPU/iter;
     cudaDeviceSynchronize();
-
+    
     cudaEventRecord(start_gpu);
     for (int z = 0; z < iter; z++)
-    SupressOverlapCUDA<<<numBlocks, threadsPerBlock >>> (Point_Cloud_dev);
+    SupressOverlapCUDA<<<numBlocks, threadsPerBlock  >>> (Point_Cloud_dev);
     cudaerr=cudaMemcpy(Point_Cloud_gpu, Point_Cloud_dev, sizeof(double) *n_total_points * 3, cudaMemcpyDeviceToHost);
+    if (cudaerr != 0)	printf("ERROR copying to Point_Cloud_gpu. CudaMalloc value=%i\n\r",cudaerr);
     cudaEventRecord(stop_gpu);
     cudaEventSynchronize(stop_gpu);
 	cudaEventElapsedTime(&timeGPU, start_gpu, stop_gpu);
@@ -624,7 +621,7 @@ int main()
     if (cudaerr != 0)	printf("ERROR copying to T_gpu. CudaMalloc value=%i\n\r",cudaerr);
     printf("ODF time:  %fms\n\r", timeGPU / iter);
     totalGPU+=timeGPU/iter;
-
+  
     start=clock();
     for (int z=0;z<iter;z++)
     TwoandTri_Donut_Fill(Point_Cloud_gpu,&T_gpu[OneDonutFill_triangles*3],&T_gpu[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_gpu[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);    
@@ -633,6 +630,27 @@ int main()
     printf("LastFill time: %fms\n", ((double)(stop - start))*1000.0/(double)CLOCKS_PER_SEC/iter);
     
     printf("total time: %fms\n",totalGPU);
+
+    
+    FILE* archivo;
+    archivo = fopen("../testfiles/CUDASphere_cloud.csv", "w+");
+    fprintf(archivo, "X, Y, Z\n");
+    for (unsigned int i=0; i < n_total_points; i++) {
+        fprintf(archivo,"%.4f, %.4f, %.4f\n", Point_Cloud_gpu[i*3+0], Point_Cloud_gpu[i * 3 + 1], Point_Cloud_gpu[i * 3 + 2]);
+    }
+    fclose(archivo);
+    archivo = fopen("../testfiles/CUDAOneMesh.csv", "w+");
+    fprintf(archivo, "V1, V2, V3\n");
+    for (unsigned int i=0; i < n_total_triangles; i++) {
+        fprintf(archivo,"%d, %d, %d\n", T_gpu[i*3+0], T_gpu[i * 3 + 1], T_gpu[i * 3 + 2]);
+    }
+    fclose(archivo);
+    printf("fin\n");
+    return;
+  
+
+
+
     //Finalmente, liberamos el resto de memoria
     cudaFree(Point_Cloud_dev);
     cudaFree(OneMesh_dev);

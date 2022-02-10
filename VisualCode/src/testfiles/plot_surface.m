@@ -46,9 +46,27 @@ for i=1:length(temp)
         display(i);
         display(temp(i,:));
         display(temp2(i,:));
-
-        break;
+        lost_values(i,:)=temp(i,:);
+        %break;
     end
 end
 %%
 temp3=readmatrix("CUDASphere_cloud.csv");
+
+%%
+
+offset=[366146.709, 8718402.7, 4546.13818;
+366149.111, 8718402.61, 4546.13184;
+365553.825 ,8717126.91 ,4516.11182;
+365553.439, 8717129.46 ,4516.16992];
+writematrix(offset,"puntos.csv");
+
+temp=[366146.629 8718402.98 4546.149;
+ 366149.466 8718402.92 4546.135;
+365553.651 8717126.82 4516.116;
+ 365553.338 8717128.96 4516.152];
+writematrix(temp,"puntos_reales.csv");
+
+for i=1:4
+    offset(i,:)-temp(i,:)
+end

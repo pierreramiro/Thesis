@@ -6,8 +6,9 @@
 
 int main(){
      /*Allocate memory*/
-    double* Point_Cloud;
+    double *Point_Cloud,*Sphere_Cloud;
     Point_Cloud = (double*)malloc(n_total_points * 3 *sizeof(double));
+    Sphere_Cloud=(double*)malloc(n_total_points * 3 *sizeof(double));
     FILE* archivo;
     
  #define FOR_TESTING 0
@@ -82,15 +83,17 @@ int main(){
     }    
     fclose(archivo);    
     //Obtenemos la reconstruccion
-    unsigned int *T,n_triangles_real_data;
+    unsigned int *T,*T_Sphere,n_triangles_real_data;
     T=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
+    T_Sphere=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
+    
     //evaluamos tiempo
     clock_t startCPU;
 	clock_t finishCPU;
 	printf("\nTiempo de ejecucion en CPU:\n");
 	startCPU = clock();
     for (int i=0;i<500;i++){
-        Generate_surface(Point_Cloud,T,&n_triangles_real_data);
+        Generate_surface(Point_Cloud,T,Sphere_Cloud,T_Sphere,&n_triangles_real_data);
     }
 	finishCPU = clock();
 	printf("numero de triangulos: %d\n",n_triangles_real_data);
@@ -138,7 +141,9 @@ int main(){
     fclose(archivo);
     //Finalmente, liberamos el resto de memoria
     free(Point_Cloud);
+    free(Sphere_Cloud);
     free(T);   
+    free(T_Sphere);   
 #endif 
     return 0;
 }

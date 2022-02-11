@@ -46,7 +46,7 @@ __global__ void cudaGenerateAZBLK(double* Point_Cloud){
 	//Generamos el primer azimuth 
     if (thid<n_beams*3){
         int index_nBeams=thid/3;
-        int index_XYZ=thid/n_beams;
+        int index_XYZ=thid-index_nBeams*3;
         double XYZ[3];
         //ubicamos el punto del azimut referencial en el plano XZ
         XYZ[0] = Radius_sphere* cos(beam_altitude_angles[index_nBeams] - MPI_2); //x
@@ -75,8 +75,6 @@ __global__ void cudaGenerateAZBLK(double* Point_Cloud){
 }
 
 __global__ void cudaGenerateDonut(double* Point_Cloud){
-    double beam_altitude_angles[n_beams]= {15.379*D180_MPI,13.236*D180_MPI,11.128*D180_MPI,9.03*D180_MPI,6.941*D180_MPI,4.878*D180_MPI,2.788*D180_MPI,0.705*D180_MPI,-1.454*D180_MPI,-3.448*D180_MPI,-5.518*D180_MPI,-7.601*D180_MPI,-9.697*D180_MPI,-11.789*D180_MPI,-13.914*D180_MPI,-16.062*D180_MPI};
-    double beam_azimuth_angles[n_beams] = { -1.24*D180_MPI, -1.2145*D180_MPI, -1.1889*D180_MPI, -1.1634*D180_MPI, -1.1379*D180_MPI, -1.1123*D180_MPI, -1.0868*D180_MPI, -1.0613*D180_MPI, -1.0357*D180_MPI, -1.0102*D180_MPI, -0.98467*D180_MPI, -0.95913*D180_MPI, -0.9336*D180_MPI, -0.90807*D180_MPI, -0.88253*D180_MPI, -0.857*D180_MPI };
     int thid = threadIdx.x + blockIdx.x * blockDim.x;//thid value from 0 to 1023
     double temp[3];
     if(thid>0){
@@ -98,8 +96,6 @@ __global__ void cudaGenerateDonut(double* Point_Cloud){
 }
 
 __global__ void cudaGenerateSphere(double* Point_Cloud){
-    double beam_altitude_angles[n_beams]= {15.379*D180_MPI,13.236*D180_MPI,11.128*D180_MPI,9.03*D180_MPI,6.941*D180_MPI,4.878*D180_MPI,2.788*D180_MPI,0.705*D180_MPI,-1.454*D180_MPI,-3.448*D180_MPI,-5.518*D180_MPI,-7.601*D180_MPI,-9.697*D180_MPI,-11.789*D180_MPI,-13.914*D180_MPI,-16.062*D180_MPI};
-    double beam_azimuth_angles[n_beams] = { -1.24*D180_MPI, -1.2145*D180_MPI, -1.1889*D180_MPI, -1.1634*D180_MPI, -1.1379*D180_MPI, -1.1123*D180_MPI, -1.0868*D180_MPI, -1.0613*D180_MPI, -1.0357*D180_MPI, -1.0102*D180_MPI, -0.98467*D180_MPI, -0.95913*D180_MPI, -0.9336*D180_MPI, -0.90807*D180_MPI, -0.88253*D180_MPI, -0.857*D180_MPI };
     int thid = threadIdx.x + blockIdx.x * blockDim.x;//thid value from 0 to 1023
     double temp[3];
     //Procedemos a rotar la Donut generada
@@ -117,71 +113,6 @@ __global__ void cudaGenerateSphere(double* Point_Cloud){
 
 
 
-
-/**
- * \brief GenerateSphereCUDA. genera esfera 
- */
-__global__ void GenerateSphereCUDA(double* Point_Cloud){
-    double beam_altitude_angles[n_beams]= {15.379*D180_MPI,13.236*D180_MPI,11.128*D180_MPI,9.03*D180_MPI,6.941*D180_MPI,4.878*D180_MPI,2.788*D180_MPI,0.705*D180_MPI,-1.454*D180_MPI,-3.448*D180_MPI,-5.518*D180_MPI,-7.601*D180_MPI,-9.697*D180_MPI,-11.789*D180_MPI,-13.914*D180_MPI,-16.062*D180_MPI};
-    double beam_azimuth_angles[n_beams] = { -1.24*D180_MPI, -1.2145*D180_MPI, -1.1889*D180_MPI, -1.1634*D180_MPI, -1.1379*D180_MPI, -1.1123*D180_MPI, -1.0868*D180_MPI, -1.0613*D180_MPI, -1.0357*D180_MPI, -1.0102*D180_MPI, -0.98467*D180_MPI, -0.95913*D180_MPI, -0.9336*D180_MPI, -0.90807*D180_MPI, -0.88253*D180_MPI, -0.857*D180_MPI };
-    //Obtenemos el ID del thread
-    int thid = threadIdx.x + blockIdx.x * blockDim.x;//thid value from 0 to 1023
-	//Generamos el primer azimuth 
-    if (thid<n_beams){
-        //ubicamos el punto del azimut referencial en el plano XZ
-        Point_Cloud[3 * thid + 0] = Radius_sphere* cos(beam_altitude_angles[thid] - MPI_2); //x
-        Point_Cloud[3 * thid + 1] = 0;                                         //y
-        Point_Cloud[3 * thid + 2] = Radius_sphere * sin(beam_altitude_angles[thid] - MPI_2);//z
-        //Realizamos la rotacion del punto con respecto al eje x debido al desfase
-        rot_x_axis_dev(&Point_Cloud[3*thid],beam_azimuth_angles[thid]);
-        /*Creamos los azimuts que inician en cada sector*/
-        /*mirror points from quarter Donut*/
-        Point_Cloud[(thid + n_AZBLK / 4 * n_beams)*3+0] = Point_Cloud[3 * thid + 0];
-        Point_Cloud[(thid+ n_AZBLK / 4 * n_beams)*3+1] = Point_Cloud[3 * thid + 2];
-        Point_Cloud[(thid + n_AZBLK / 4 * n_beams)*3+2] = -Point_Cloud[3 * thid + 1];
-        /*mirror points from midle Donut*/
-        Point_Cloud[(thid + n_AZBLK / 2 * n_beams)*3+0] = Point_Cloud[3 * thid + 0];
-        Point_Cloud[(thid + n_AZBLK / 2 * n_beams)*3+1] = -Point_Cloud[3 * thid + 1];
-        Point_Cloud[(thid + n_AZBLK / 2 * n_beams)*3+2] = -Point_Cloud[3 * thid + 2];
-        /*mirror points from 3 quater Donut*/
-        Point_Cloud[(thid + n_AZBLK * 3 / 4 * n_beams)*3 +0] = Point_Cloud[3 * thid + 0];
-        Point_Cloud[(thid + n_AZBLK * 3 / 4 * n_beams)*3 +1] = -Point_Cloud[3 * thid + 2];
-        Point_Cloud[(thid + n_AZBLK * 3 / 4 * n_beams)*3 +2] = Point_Cloud[3 * thid + 1];
-    }
-    __syncthreads();
-    /*Definimos la matrix de rotación para los azimuth*/
-    /*Procedemos a realizar el barrido de cada sector para obtener la donnut referencial*/
-    double temp[3];
-    if(thid>0){
-        double rot_matrix[9] = { 1,0,0,0,cos(angle_between_azimuths*(double)thid),-sin(angle_between_azimuths*(double)thid),0,sin(angle_between_azimuths*(double)thid),cos(angle_between_azimuths*(double)thid) };
-        double XYZ[3];
-        for (int j = 0; j < n_beams;j++) {
-            //Obtain point from referencial azimuth
-            XYZ[0] = Point_Cloud[j*3 + 0];
-            XYZ[1] = Point_Cloud[j*3 + 1];
-            XYZ[2] = Point_Cloud[j*3 + 2];
-            //rotate that point
-            mult_matrix_dev (rot_matrix,3,3,XYZ,1,temp);
-            //Set the new azimuth
-            Point_Cloud[(thid * n_beams + j)*3 + 0] = temp[0];
-            Point_Cloud[(thid * n_beams + j)*3 + 1] = temp[1];
-            Point_Cloud[(thid * n_beams + j)*3 + 2] = temp[2];
-        }
-    }
-    __syncthreads();
-    //Procedemos a rotar la Donut generada
-    for (unsigned int i = 1; i < n_donuts; i++) {
-        double rot_motor_matrix[9]={ cos(rot_angle*(double)i),-sin(rot_angle*(double)i),0,sin(rot_angle*(double)i),cos(rot_angle*(double)i) ,0,0,0,1 };
-        //multiplicamos a todos los n_point_perdonut de la Donut referencial con la matriz de rotación respectiva
-        for(int j=0;j<n_beams;j++){
-            mult_matrix_dev(rot_motor_matrix, 3, 3, &Point_Cloud[(thid*n_beams+j) * 3], 1, temp);
-            Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 0] = temp[0];
-            Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 1] = temp[1];
-            Point_Cloud[(i * n_points_perDonut + thid*n_beams+j) * 3 + 2] = temp[2];        
-        }
-    }
-    __syncthreads();
-}
 /**
  * \brief SupressOverlapCUDA. OR 
  */
@@ -272,6 +203,92 @@ __global__ void SupressOverlapCUDA(double* Point_Cloud){
 /**
  * \brief OneDonutFillCUDA.  
  */
+__global__ void cudaODF_part1(double* Point_Cloud,unsigned int* T){
+    int thid = threadIdx.x + blockIdx.x * blockDim.x;
+    if(thid<n_AZBLK*(n_beams-1)){
+        int index_AZBLK=thid/(double)(n_beams-1);
+        int index_nBeams=(thid-index_AZBLK*(n_beams-1));
+        //T[thid*3]=thid;
+        //T[thid*3+1]=index_AZBLK;
+        //T[thid*3+2]=index_nBeams;
+        
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6]=thid;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+1]=index_AZBLK;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+2]=index_nBeams;
+        
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+3]=thid;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+4]=index_AZBLK;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+5]=index_nBeams;
+
+    
+    }else{
+    //if(thid<n_AZBLK*(n_beams-1)){
+        int index_AZBLK=thid/(double)(n_beams-1);
+        int index_nBeams=(thid-index_AZBLK*(n_beams-1));
+        unsigned int v0,v1,v2;
+        //Definimos los vértices
+        //Realizamos la malla triangular para la Donut referencial
+        v0=index_AZBLK*n_beams+index_nBeams;
+        v2=v0+1;
+        v1=(v0+n_beams+1)&mask;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6]=v0;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+1]=v1;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+2]=v2;
+        v2=v1;
+        v1=v2-1;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+3]=v0;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+4]=v1;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+5]=v2;
+    }
+}
+
+__global__ void cudaODF_part2(double* Point_Cloud,unsigned int* T,unsigned int* flag_array){
+    int thid = threadIdx.x + blockIdx.x * blockDim.x;
+    if (thid<n_triangles_perDonut*(n_beams-1)){ //thid from  0 to 184320
+        int index_Donut=thid/(double)n_triangles_perDonut+1;
+        int index_triPerDonut=thid-(index_Donut-1)*n_triangles_perDonut;
+        double xp,yp,zp;
+        unsigned int flag=0;
+        unsigned int temp_vex=(T[index_triPerDonut*3]+index_Donut*n_points_perDonut);
+        xp=Point_Cloud[temp_vex*3+0];
+        yp=Point_Cloud[temp_vex*3+1];
+        zp=Point_Cloud[temp_vex*3+2];
+            
+        if ((xp!=0)||(yp!=0)||(zp!=0)){
+            //analizamos el punto del vertice v1
+            temp_vex=(T[index_triPerDonut*3+1]+index_Donut*n_points_perDonut);
+            xp=Point_Cloud[temp_vex*3+0];
+            yp=Point_Cloud[temp_vex*3+1];
+            zp=Point_Cloud[temp_vex*3+2];
+            if ((xp!=0)||(yp!=0)||(zp!=0)){
+                //analizamos el punto del vertice v2
+                temp_vex=(T[index_triPerDonut*3+2]+index_Donut*n_points_perDonut);
+                xp=Point_Cloud[temp_vex*3+0];
+                yp=Point_Cloud[temp_vex*3+1];
+                zp=Point_Cloud[temp_vex*3+2];
+                if ((xp!=0)||(yp!=0)||(zp!=0)){
+                    //Si todo lo anterior se cumple, guardamos el triángulo
+                    flag=1;
+                }
+            }
+        }
+        flag_array[thid-n_triangles_perDonut]=flag;
+    }  
+}
+void cpuODF_part3 (double* Point_Cloud,unsigned int *T,unsigned int *flag_array){
+    //analizamos los flags
+    int count=0;
+    for (unsigned int z = 0; z < n_triangles_perDonut*(n_donuts-1); z++)
+    {
+        if (flag_array[z]==1){
+            count++;
+        }
+    }
+    printf ("%d\n",count);
+    
+
+}
+
 __global__ void ODF_part1(double* Point_Cloud,unsigned int* T,unsigned int* T_temp,unsigned int* count_array){
     int thid = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int v0,v1,v2;
@@ -485,6 +502,7 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,double* Sphere_Clou
     pointer_n_triangles[0]=n_triangles; 
 }
 
+
 /******************************************************************/
 /*************************       MAIN     *************************/
 /******************************************************************/
@@ -614,7 +632,7 @@ int main()
     free (T_Sphere_cpu);
     return 0;
 #elif TESTING == 1
-    #define iter 1000.0
+    #define iter 100.0
     /*************************************************************************************/
     /***********************************    CPU     **************************************/
     /*************************************************************************************/
@@ -641,11 +659,72 @@ int main()
     printf("OR time: %fms\n", ((double)(stop - start))*1000.0/(double)CLOCKS_PER_SEC/iter);
     
     start=clock();
-    for (int z=0;z<iter;z++)
-    One_Donut_Fill(Point_Cloud,T);
+    for (int z=0;z<iter;z++){
+        //One_Donut_Fill(Point_Cloud,T);
+        unsigned int v0,v1,v2;
+        //Definimos los vértices
+        //Realizamos la malla triangular para la Donut referencial
+        for (unsigned int j = 0; j < n_AZBLK; j++){
+            for (unsigned int k = 0; k < n_beams-1; k++)
+            {   
+                v0=j*n_beams+k;
+                v2=v0+1;
+                v1=(v0+n_beams+1)&mask;
+                T[j*(n_beams-1)*3*2+k*6]=v0;
+                T[j*(n_beams-1)*3*2+k*6+1]=v1;
+                T[j*(n_beams-1)*3*2+k*6+2]=v2;
+                v2=v1;
+                v1=v2-1;
+                T[j*(n_beams-1)*3*2+k*6+3]=v0;
+                T[j*(n_beams-1)*3*2+k*6+4]=v1;
+                T[j*(n_beams-1)*3*2+k*6+5]=v2;
+            }
+        }
+    }
     stop=clock();
     timeCPU+=((double)(stop - start))*1000.0/(double)CLOCKS_PER_SEC/iter;
-    printf("ODF time: %fms\n", ((double)(stop - start))*1000.0/(double)CLOCKS_PER_SEC/iter);
+    printf("ODF_pt1 time: %fms\n", ((double)(stop - start))*1000.0/(double)CLOCKS_PER_SEC/iter);
+    
+    start=clock();
+    for (int z=0;z<iter;z++){
+        //En base a la malla referencial hallamos las demás superficies
+        double xp,yp,zp;
+        unsigned int temp_vex,count=0;
+        for (unsigned int i = 1; i < n_donuts; i++){
+            //Analizamos cada vertice del tríangulo
+            for (unsigned int j = 0; j < n_triangles_perDonut; j++){
+                //Analizamos el punto del vertice v0
+                temp_vex=(T[j*3]+i*n_points_perDonut);
+                xp=Point_Cloud[temp_vex*3+0];
+                yp=Point_Cloud[temp_vex*3+1];
+                zp=Point_Cloud[temp_vex*3+2];
+                if ((xp!=0)||(yp!=0)||(zp!=0)){
+                    //analizamos el punto del vertice v1
+                    temp_vex=(T[j*3+1]+i*n_points_perDonut);
+                    xp=Point_Cloud[temp_vex*3+0];
+                    yp=Point_Cloud[temp_vex*3+1];
+                    zp=Point_Cloud[temp_vex*3+2];
+                    if ((xp!=0)||(yp!=0)||(zp!=0)){
+                        //analizamos el punto del vertice v2
+                        temp_vex=(T[j*3+2]+i*n_points_perDonut);
+                        xp=Point_Cloud[temp_vex*3+0];
+                        yp=Point_Cloud[temp_vex*3+1];
+                        zp=Point_Cloud[temp_vex*3+2];
+                        if ((xp!=0)||(yp!=0)||(zp!=0)){
+                            //Si todo lo anterior se cumple, guardamos el triángulo
+                            T[n_triangles_perDonut*3+count*3+2]=temp_vex;
+                            T[n_triangles_perDonut*3+count*3+1]=(T[j*3+1]+i*n_points_perDonut);
+                            T[n_triangles_perDonut*3+count*3]=(T[j*3]+i*n_points_perDonut);
+                            count++;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    stop=clock();
+    timeCPU+=((double)(stop - start))*1000.0/(double)CLOCKS_PER_SEC/iter;
+    printf("ODF_pt2 time: %fms\n", ((double)(stop - start))*1000.0/(double)CLOCKS_PER_SEC/iter);
     printf("total time to compare: %fms\n",timeCPU);
     
     start=clock();
@@ -695,29 +774,38 @@ int main()
     printf("OR time:  %fms\n\r", timeGPU / iter);
     totalGPU+=timeGPU/iter;
 
-    unsigned int *T_gpu,*OneMesh_dev,*OneMesh_temp_dev;
-    unsigned int *count_array_dev,*index_offset_array_dev;
-    
-    cudaMalloc((void**)(&OneMesh_dev), sizeof(unsigned int) * n_total_triangles * 3);
-    cudaMalloc((void**)(&OneMesh_temp_dev), sizeof(unsigned int) * n_triangles_perDonut* (n_donuts-1) * 3);
-    cudaMalloc((void**)(&count_array_dev), sizeof(unsigned int) * 1024);
+    unsigned int *OneMesh_dev;
+    unsigned int *flag_array_dev,*index_offset_array_dev;
+    cudaMalloc((void**)(&OneMesh_dev), sizeof(unsigned int) * n_triangles_perDonut * 3);
+    cudaMalloc((void**)(&flag_array_dev), sizeof(unsigned int) * n_triangles_perDonut*(n_donuts-1));
     cudaMalloc((void**)(&index_offset_array_dev), sizeof(unsigned int) * 1024);
-    T_gpu=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
+    unsigned int *T_gpu=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
 
+    unsigned int *flag_array=(unsigned int*)malloc(n_triangles_perDonut*(n_donuts-1) *sizeof(unsigned int));
     //3rd step. First part of the ODF
     cudaEventRecord(start_gpu);
     for (int z = 0; z < iter; z++){
-        ODF_part1<<<numBlocks, threadsPerBlock >>> (Point_Cloud_dev,OneMesh_dev,OneMesh_temp_dev,count_array_dev);
-        //4th step. eScan GPU
-        eScanGPU<<<1, 1024/2 >>> (index_offset_array_dev,count_array_dev);
-        //5th step. last part ODF
-        ODF_part2<<<numBlocks, threadsPerBlock >>> (OneMesh_dev,OneMesh_temp_dev,count_array_dev,index_offset_array_dev);
-        cudaerr=cudaMemcpy(T_gpu,OneMesh_dev, sizeof(unsigned int) *OneDonutFill_triangles * 3, cudaMemcpyDeviceToHost);
+        int temp_blok=64;
+        cudaODF_part1<<<n_AZBLK*(n_beams-1)/temp_blok, temp_blok >>> (Point_Cloud_dev,OneMesh_dev);
+        temp_blok=128;
+        cudaODF_part2<<<n_triangles_perDonut*(n_donuts-1)/temp_blok, temp_blok >>> (Point_Cloud_dev,OneMesh_dev,flag_array_dev);
+        cudaDeviceSynchronize();
+        cudaerr=cudaMemcpy(T_gpu,OneMesh_dev, sizeof(unsigned int) *n_triangles_perDonut *3, cudaMemcpyDeviceToHost);
+        if (cudaerr != 0)	printf("ERROR copying to OneMesh, index %d. CudaMalloc value=%i\n\r",z,cudaerr);
+        cudaerr=cudaMemcpy(flag_array,flag_array_dev, sizeof(unsigned int) *n_triangles_perDonut*(n_donuts-1) , cudaMemcpyDeviceToHost);
+        if (cudaerr != 0)	printf("ERROR copying to flag_array, index %d. CudaMalloc value=%i\n\r",z,cudaerr);
+        
+        cpuODF_part3(Point_Cloud_gpu,T_gpu,flag_array);
+        
+        ////4th step. eScan GPU
+        //eScanGPU<<<1, 1024/2 >>> (index_offset_array_dev,count_array_dev);
+        ////5th step. last part ODF
+        //ODF_part2<<<numBlocks, threadsPerBlock >>> (OneMesh_dev,OneMesh_temp_dev,count_array_dev,index_offset_array_dev);
+        //cudaerr=cudaMemcpy(T_gpu,OneMesh_dev, sizeof(unsigned int) *OneDonutFill_triangles * 3, cudaMemcpyDeviceToHost);
     }
     cudaEventRecord(stop_gpu);
     cudaEventSynchronize(stop_gpu);
 	cudaEventElapsedTime(&timeGPU, start_gpu, stop_gpu);
-    if (cudaerr != 0)	printf("ERROR copying to T_gpu. CudaMalloc value=%i\n\r",cudaerr);
     printf("ODF time:  %fms\n\r", timeGPU / iter);
     totalGPU+=timeGPU/iter;
 
@@ -743,8 +831,7 @@ int main()
     //Finalmente, liberamos el resto de memoria
     cudaFree(Point_Cloud_dev);
     cudaFree(OneMesh_dev);
-    cudaFree(OneMesh_temp_dev);
-    cudaFree(count_array_dev);
+    cudaFree(flag_array_dev);
     cudaFree(index_offset_array_dev);
     free(Point_Cloud_gpu);
     free(T_gpu); 

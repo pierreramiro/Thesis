@@ -41,8 +41,6 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
   /usr/include/x86_64-linux-gnu/bits/types/locale_t.h \
   /usr/include/x86_64-linux-gnu/bits/types/__locale_t.h \
   /usr/include/strings.h \
-  /usr/include/x86_64-linux-gnu/bits/strings_fortified.h \
-  /usr/include/x86_64-linux-gnu/bits/string_fortified.h \
   /usr/include/time.h \
   /usr/include/x86_64-linux-gnu/bits/time.h \
   /usr/include/x86_64-linux-gnu/bits/types.h \
@@ -80,8 +78,6 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
   /usr/lib/gcc/x86_64-linux-gnu/7/include/stdarg.h \
   /usr/include/x86_64-linux-gnu/bits/stdio_lim.h \
   /usr/include/x86_64-linux-gnu/bits/sys_errlist.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio.h \
-  /usr/include/x86_64-linux-gnu/bits/stdio2.h \
   /usr/include/c++/7/stdlib.h \
   /usr/include/c++/7/cstdlib \
   /usr/include/stdlib.h \
@@ -100,16 +96,13 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
   /usr/include/x86_64-linux-gnu/bits/select.h \
   /usr/include/x86_64-linux-gnu/bits/types/sigset_t.h \
   /usr/include/x86_64-linux-gnu/bits/types/__sigset_t.h \
-  /usr/include/x86_64-linux-gnu/bits/select2.h \
   /usr/include/x86_64-linux-gnu/sys/sysmacros.h \
   /usr/include/x86_64-linux-gnu/bits/sysmacros.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h \
   /usr/include/x86_64-linux-gnu/bits/thread-shared-types.h \
   /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h \
   /usr/include/alloca.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h \
   /usr/include/x86_64-linux-gnu/bits/stdlib-float.h \
-  /usr/include/x86_64-linux-gnu/bits/stdlib.h \
   /usr/include/c++/7/bits/std_abs.h \
   /usr/include/assert.h \
   /usr/local/cuda-11.6/targets/x86_64-linux/include/crt/math_functions.h \
@@ -126,7 +119,6 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
   /usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h \
   /usr/include/x86_64-linux-gnu/bits/mathcalls.h \
   /usr/include/x86_64-linux-gnu/bits/iscanonical.h \
-  /usr/include/x86_64-linux-gnu/bits/mathinline.h \
   /usr/local/cuda-11.6/targets/x86_64-linux/include/crt/math_functions.hpp \
   /usr/local/cuda-11.6/targets/x86_64-linux/include/cuda_surface_types.h \
   /usr/local/cuda-11.6/targets/x86_64-linux/include/cuda_texture_types.h \
@@ -208,6 +200,8 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 
 /usr/include/x86_64-linux-gnu/bits/iscanonical.h:
 
+/usr/include/x86_64-linux-gnu/bits/mathcalls.h:
+
 /usr/include/x86_64-linux-gnu/bits/mathcalls-helper-functions.h:
 
 /usr/include/x86_64-linux-gnu/bits/fp-fast.h:
@@ -215,6 +209,10 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 /usr/include/x86_64-linux-gnu/bits/wchar.h:
 
 /usr/include/x86_64-linux-gnu/bits/fp-logb.h:
+
+/usr/local/cuda-11.6/targets/x86_64-linux/include/sm_20_atomic_functions.hpp:
+
+/usr/include/x86_64-linux-gnu/bits/flt-eval-method.h:
 
 /usr/include/x86_64-linux-gnu/bits/libm-simd-decl-stubs.h:
 
@@ -230,13 +228,11 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 
 /usr/include/c++/7/bits/std_abs.h:
 
-/usr/include/x86_64-linux-gnu/bits/stdlib.h:
-
 /usr/include/x86_64-linux-gnu/bits/stdlib-float.h:
 
-/usr/include/x86_64-linux-gnu/bits/stdlib-bsearch.h:
-
 /usr/include/x86_64-linux-gnu/bits/pthreadtypes-arch.h:
+
+/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h:
 
 /usr/include/x86_64-linux-gnu/bits/pthreadtypes.h:
 
@@ -261,16 +257,6 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 /usr/include/x86_64-linux-gnu/bits/waitstatus.h:
 
 /usr/include/c++/7/cstdlib:
-
-/usr/include/c++/7/stdlib.h:
-
-/usr/include/x86_64-linux-gnu/bits/thread-shared-types.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio.h:
-
-/usr/include/x86_64-linux-gnu/bits/mathinline.h:
-
-/usr/include/x86_64-linux-gnu/bits/sys_errlist.h:
 
 /usr/local/cuda-11.6/targets/x86_64-linux/include/crt/common_functions.h:
 
@@ -320,15 +306,7 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 
 /usr/local/cuda-11.6/targets/x86_64-linux/include/channel_descriptor.h:
 
-/usr/local/cuda-11.6/targets/x86_64-linux/include/sm_20_atomic_functions.hpp:
-
-/usr/include/x86_64-linux-gnu/bits/flt-eval-method.h:
-
-/usr/include/x86_64-linux-gnu/bits/string_fortified.h:
-
 /usr/include/x86_64-linux-gnu/bits/types/locale_t.h:
-
-/usr/include/x86_64-linux-gnu/bits/select2.h:
 
 /usr/include/x86_64-linux-gnu/bits/waitflags.h:
 
@@ -382,10 +360,6 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 
 /usr/include/x86_64-linux-gnu/bits/long-double.h:
 
-/usr/include/x86_64-linux-gnu/bits/mathcalls.h:
-
-/usr/include/x86_64-linux-gnu/bits/strings_fortified.h:
-
 /usr/include/x86_64-linux-gnu/bits/xopen_lim.h:
 
 /usr/include/x86_64-linux-gnu/gnu/stubs-64.h:
@@ -415,6 +389,8 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 /usr/include/x86_64-linux-gnu/c++/7/bits/c++config.h:
 
 /usr/include/x86_64-linux-gnu/c++/7/bits/cpu_defines.h:
+
+/usr/include/c++/7/stdlib.h:
 
 /usr/include/x86_64-linux-gnu/bits/select.h:
 
@@ -447,6 +423,8 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 /usr/include/math.h:
 
 /usr/include/c++/7/bits/exception_defines.h:
+
+/usr/include/x86_64-linux-gnu/bits/sys_errlist.h:
 
 /usr/include/x86_64-linux-gnu/sys/select.h:
 
@@ -485,8 +463,6 @@ CMakeFiles/main.dir/main.cu.o: ../main.cu \
 /usr/include/x86_64-linux-gnu/bits/types.h:
 
 /usr/include/x86_64-linux-gnu/bits/types/FILE.h:
-
-/usr/include/x86_64-linux-gnu/bits/stdio2.h:
 
 /usr/local/cuda-11.6/targets/x86_64-linux/include/driver_functions.h:
 

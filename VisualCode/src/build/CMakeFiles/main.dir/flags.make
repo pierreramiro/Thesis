@@ -6,5 +6,5 @@ CUDA_DEFINES =
 
 CUDA_INCLUDES = 
 
-CUDA_FLAGS = -O3 -DNDEBUG -std=c++14
+CUDA_FLAGS = -std=c++14
 

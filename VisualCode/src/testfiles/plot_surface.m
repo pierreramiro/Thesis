@@ -38,35 +38,26 @@ scatter3(Point_Cloud((i-1)*16+1:i*16,1),Point_Cloud((i-1)*16+1:i*16,2),Point_Clo
 pause(0.00001);
 end
 %%
-temp=readmatrix("CUDASphere_cloud.csv");
-temp2=readmatrix("Sphere_cloud.csv");
+temp=readmatrix("CUDAOneMesh.csv");
+temp2=readmatrix("One_donut_fill.csv");
 
 for i=1:length(temp)
-    if ~isequal(ceil(temp(i,:)),ceil(temp2(i,:)))
+    if ~isequal(temp(i,:),temp2(i,:))
         display(i);
         display(temp(i,:));
         display(temp2(i,:));
         lost_values(i,:)=temp(i,:);
-        %break;
+        break;
     end
 end
 %%
 temp3=readmatrix("CUDASphere_cloud.csv");
-
 %%
-
-offset=[366146.709, 8718402.7, 4546.13818;
-366149.111, 8718402.61, 4546.13184;
-365553.825 ,8717126.91 ,4516.11182;
-365553.439, 8717129.46 ,4516.16992];
-writematrix(offset,"puntos.csv");
-
-temp=[366146.629 8718402.98 4546.149;
- 366149.466 8718402.92 4546.135;
-365553.651 8717126.82 4516.116;
- 365553.338 8717128.96 4516.152];
-writematrix(temp,"puntos_reales.csv");
-
-for i=1:4
-    offset(i,:)-temp(i,:)
+thid=0;
+for i=1:16*3
+index_nBeams(i)=fix(thid/3);
+index_XYZ(i)=fix(thid-index_nBeams(i)*3);
+thid=thid+1;
 end
+index_nBeams
+index_XYZ

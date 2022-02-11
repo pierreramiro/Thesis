@@ -203,7 +203,7 @@ __global__ void SupressOverlapCUDA(double* Point_Cloud){
 /**
  * \brief OneDonutFillCUDA.  
  */
-__global__ void cudaODF_part1(double* Point_Cloud,unsigned int* T){
+__global__ void cudaODF_part1(unsigned int* T){
     int thid = threadIdx.x + blockIdx.x * blockDim.x;
     if(thid<n_AZBLK*(n_beams-1)){
         int index_AZBLK=thid/(double)(n_beams-1);
@@ -215,10 +215,9 @@ __global__ void cudaODF_part1(double* Point_Cloud,unsigned int* T){
         T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6]=thid;
         T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+1]=index_AZBLK;
         T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+2]=index_nBeams;
-        
-        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+3]=thid;
-        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+4]=index_AZBLK;
-        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+5]=index_nBeams;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+3]=1;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+4]=2;
+        T[index_AZBLK*(n_beams-1)*3*2+index_nBeams*6+5]=3;
 
     
     }else{
@@ -780,13 +779,12 @@ int main()
     cudaMalloc((void**)(&flag_array_dev), sizeof(unsigned int) * n_triangles_perDonut*(n_donuts-1));
     cudaMalloc((void**)(&index_offset_array_dev), sizeof(unsigned int) * 1024);
     unsigned int *T_gpu=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
-
     unsigned int *flag_array=(unsigned int*)malloc(n_triangles_perDonut*(n_donuts-1) *sizeof(unsigned int));
     //3rd step. First part of the ODF
     cudaEventRecord(start_gpu);
     for (int z = 0; z < iter; z++){
         int temp_blok=64;
-        cudaODF_part1<<<n_AZBLK*(n_beams-1)/temp_blok, temp_blok >>> (Point_Cloud_dev,OneMesh_dev);
+        cudaODF_part1<<<n_AZBLK*(n_beams-1)/temp_blok, temp_blok >>> (OneMesh_dev);
         temp_blok=128;
         cudaODF_part2<<<n_triangles_perDonut*(n_donuts-1)/temp_blok, temp_blok >>> (Point_Cloud_dev,OneMesh_dev,flag_array_dev);
         cudaDeviceSynchronize();
@@ -795,7 +793,7 @@ int main()
         cudaerr=cudaMemcpy(flag_array,flag_array_dev, sizeof(unsigned int) *n_triangles_perDonut*(n_donuts-1) , cudaMemcpyDeviceToHost);
         if (cudaerr != 0)	printf("ERROR copying to flag_array, index %d. CudaMalloc value=%i\n\r",z,cudaerr);
         
-        cpuODF_part3(Point_Cloud_gpu,T_gpu,flag_array);
+        //cpuODF_part3(Point_Cloud_gpu,T_gpu,flag_array);
         
         ////4th step. eScan GPU
         //eScanGPU<<<1, 1024/2 >>> (index_offset_array_dev,count_array_dev);
@@ -821,8 +819,8 @@ int main()
     fclose(archivo);
     archivo = fopen("../testfiles/CUDAOneMesh.csv", "w+");
     fprintf(archivo, "V1, V2, V3\n");
-    for (unsigned int i=0; i < n_total_triangles; i++) {
-        fprintf(archivo,"%d, %d, %d\n", T_gpu[i*3+0], T_gpu[i * 3 + 1], T_gpu[i * 3 + 2]);
+    for (unsigned int i=0; i < n_triangles_perDonut; i++) {
+        fprintf(archivo,"%d, %d, %d\n", OneMesh[i*3+0], OneMesh[i * 3 + 1], OneMesh[i * 3 + 2]);
     }
     fclose(archivo);
     printf("fin\n");

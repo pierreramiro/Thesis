@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include "ouster_reconstruction.h"
 //CUDA libraries
-#define threadsPerBlock 8  //
+#define threadsPerBlock 
 #define numBlocks (1024/threadsPerBlock) //(n_AZBLK/1024)
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
@@ -243,9 +243,9 @@ __global__ void cudaODF_part1(unsigned int* T){
 
 __global__ void cudaODF_part2(double* Point_Cloud,unsigned int* T,bool* flag_array){
     int thid = threadIdx.x + blockIdx.x * blockDim.x;
-    if (thid<n_triangles_perDonut*(n_donuts-1)){ 
-        int index_Donut=thid/(double)n_triangles_perDonut+1;
-        int index_triPerDonut=thid-(index_Donut-1)*n_triangles_perDonut;
+    if (thid<n_triangles_perDonut*n_donuts){ 
+        int index_Donut=thid/(double)n_triangles_perDonut;
+        int index_triPerDonut=thid-(index_Donut)*n_triangles_perDonut;
         double xp,yp,zp;
         bool flag=0;
         unsigned int temp_vex=(T[index_triPerDonut*3]+index_Donut*n_points_perDonut);
@@ -274,23 +274,138 @@ __global__ void cudaODF_part2(double* Point_Cloud,unsigned int* T,bool* flag_arr
         flag_array[thid]=flag;
     }  
 }
-void cpuODF_part3 (unsigned int *T,bool *flag_array){
+void cpuODF_part3 (unsigned int *T,unsigned int *OneMesh,bool *flag_array,unsigned int* pointer_n_triangles){
     //analizamos los flags
     int count=0;
-    for (unsigned int i = 0; i <(n_donuts-1); i++){
+    for (unsigned int i = 0; i <n_donuts; i++){
         for(unsigned int z = 0; z < n_triangles_perDonut; z++){
             if (flag_array[i*n_triangles_perDonut+z]==1){
-                T[n_triangles_perDonut*3+count*3+2]=T[z*3+2]+(i+1)*n_points_perDonut;
-                T[n_triangles_perDonut*3+count*3+1]=(T[z*3+1]+(i+1)*n_points_perDonut);
-                T[n_triangles_perDonut*3+count*3]=(T[z*3]+(i+1)*n_points_perDonut);
+                T[count*3+2]=OneMesh[z*3+2]+i*n_points_perDonut;
+                T[count*3+1]=(OneMesh[z*3+1]+i*n_points_perDonut);
+                T[count*3]=(OneMesh[z*3]+i*n_points_perDonut);
                 count++;
             }
         }
     }
+    pointer_n_triangles[0]=count;
 }
 
+__global__ void cudaModifyCloud(double* Point_Cloud, bool* flag_array){
+    int thid = threadIdx.x + blockIdx.x * blockDim.x;
+    if (thid<n_total_points){
+        if (flag_array[thid]){
+            Point_Cloud[thid*3]=0;
+            Point_Cloud[thid*3+1]=0;
+            Point_Cloud[thid*3+2]=0;
+        }
+    } 
+}
+void cudaGenerateSurface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_n_triangles){
+    //Create device variables
+    cudaError_t cudaerr;
+    double* Sphere_Cloud_dev;
+    cudaMalloc((void**)(&Sphere_Cloud_dev), n_total_points * 3*sizeof(double));
+    unsigned int *OneMesh_dev;
+    cudaMalloc((void**)(&OneMesh_dev), n_triangles_perDonut * 3*sizeof(unsigned int) );
+    bool *flag_NullPoints_dev;
+    cudaMalloc((void**)(&flag_NullPoints_dev),n_total_points* sizeof(bool) );
+    bool *flag_array_dev;
+    cudaMalloc((void**)(&flag_array_dev), n_triangles_perDonut*n_donuts*sizeof(bool));
+    //Create CPU vairables
+    int temp_blok;
+    double xp,yp,zp;
+    unsigned int n_triangles=0;
+    double *Sphere_Cloud=(double*)malloc(n_total_points*3*sizeof(double));
+    unsigned int * OneMesh =(unsigned int*)malloc(n_triangles_perDonut*3*sizeof(unsigned int));
+    unsigned int *T_temp =(unsigned int*)malloc((n_total_triangles-OneDonutFill_triangles)*3*sizeof(unsigned int));
+    bool *flag_array=(bool*)malloc(n_triangles_perDonut*n_donuts*sizeof(bool));
+    bool *flag_NullPoints=(bool*)malloc(n_total_points *sizeof(bool));
 
-void cudaGenerateSurface(double* Point_Cloud,unsigned int* T,double* Sphere_Cloud,unsigned int* T_Sphere,unsigned int *pointer_n_triangles){
+
+    //GenerateSphere
+    cudaGenerateAZBLK<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev);
+    cudaGenerateDonut<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev);
+    cudaGenerateSphere<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev);
+    //Overlap removing
+    SupressOverlapCUDA<<<numBlocks, threadsPerBlock >>> (Sphere_Cloud_dev);
+    //Create only OneDonutMesh
+    temp_blok=32;/////This parameter can be changed
+    cudaODF_part1<<<n_AZBLK*(n_beams-1)/temp_blok, temp_blok >>> (OneMesh_dev);
+    //Create flag_array for null points
+    for(unsigned int z=0;z<n_total_points;z++){
+        xp=Point_Cloud[z*3+0];
+        yp=Point_Cloud[z*3+1];
+        zp=Point_Cloud[z*3+2];
+        if ((xp==0)&&(yp==0)&&(zp==0)){
+            flag_NullPoints[z]=1;//NULL point
+        }else{
+            flag_NullPoints[z]=0;
+        }
+    }
+    //Send to Device flag_array of NULL Points
+    cudaerr=cudaMemcpy(flag_NullPoints_dev, flag_NullPoints,n_total_points* sizeof(bool), cudaMemcpyHostToDevice);
+    if (cudaerr != 0)	printf("ERROR copying to flag_NullPoints_dev. CudaMalloc value=%i\n\r",cudaerr);
+    cudaerr=cudaMemcpy(Sphere_Cloud, Sphere_Cloud_dev, sizeof(double) *n_total_points * 3, cudaMemcpyDeviceToHost);
+    if (cudaerr != 0)	printf("ERROR copying to SphereCloud. CudaMalloc value=%i\n\r",cudaerr);
+    
+    //Modify SphereCloud of Device
+    temp_blok=32;/////This parameter can be changed
+    cudaModifyCloud <<<n_total_points/temp_blok,temp_blok>>> (Sphere_Cloud_dev,flag_NullPoints_dev);
+    //Generate the flag_array of NULL triangles
+    temp_blok=32;/////This parameter can be changed
+    cudaODF_part2<<<n_triangles_perDonut*n_donuts/temp_blok, temp_blok >>> (Sphere_Cloud_dev,OneMesh_dev,flag_array_dev);
+    cudaerr=cudaMemcpy(OneMesh,OneMesh_dev, sizeof(unsigned int) *n_triangles_perDonut *3, cudaMemcpyDeviceToHost);
+    if (cudaerr != 0)	printf("ERROR copying to T_Sphere. CudaMalloc value=%i\n\r",cudaerr);
+    cudaerr=cudaMemcpy(flag_array,flag_array_dev, sizeof(bool) *n_triangles_perDonut*n_donuts , cudaMemcpyDeviceToHost);
+    if (cudaerr != 0)	printf("ERROR copying to flag_array. CudaMalloc value=%i\n\r",cudaerr); 
+    
+    //Create the Mesh
+    cpuODF_part3(T,OneMesh,flag_array,&n_triangles);
+    TwoandTri_Donut_Fill(Sphere_Cloud,&T_temp[0],&T_temp[(TwoDonutFill_triangles)*3],&T_temp[(TwoDonutFill_triangles+TriDonutFill_triangles)*3]);
+    //printf("2\n");
+    
+
+    for (unsigned int i = 0; i < n_total_triangles-OneDonutFill_triangles; i++){
+        //Analizamos el punto del vertice v0
+        unsigned int temp_vex=T_temp[i*3];
+        xp=Point_Cloud[temp_vex*3+0];
+        yp=Point_Cloud[temp_vex*3+1];
+        zp=Point_Cloud[temp_vex*3+2];
+        if ((xp!=0)&&(yp!=0)&&(zp!=0)){
+            //analizamos el punto del vertice v1
+            temp_vex=T_temp[i*3+1];
+            xp=Point_Cloud[temp_vex*3+0];
+            yp=Point_Cloud[temp_vex*3+1];
+            zp=Point_Cloud[temp_vex*3+2];
+            if ((xp!=0)&&(yp!=0)&&(zp!=0)){
+                //analizamos el punto del vertice v2
+                temp_vex=T_temp[i*3+2];
+                xp=Point_Cloud[temp_vex*3+0];
+                yp=Point_Cloud[temp_vex*3+1];
+                zp=Point_Cloud[temp_vex*3+2];
+                if ((xp!=0)&&(yp!=0)&&(zp!=0)){
+                    //Si todo lo anterior se cumple, guardamos el triángulo
+                    T[n_triangles*3+2]=temp_vex;
+                    T[n_triangles*3+1]=T_temp[i*3+1];
+                    T[n_triangles*3]=T_temp[i*3];
+                    n_triangles++;
+                }
+            }
+        }
+    }
+    pointer_n_triangles[0]=n_triangles; 
+    cudaFree(Sphere_Cloud_dev);
+    cudaFree(OneMesh_dev);
+    cudaFree(flag_NullPoints_dev);
+    cudaFree(flag_array_dev);
+    free(Sphere_Cloud);
+    free(OneMesh);
+    free(flag_NullPoints);
+    free(flag_array);
+    free(T_temp);
+}
+
+void cudaGenerateSurface_old(double* Point_Cloud,unsigned int* T,double* Sphere_Cloud,unsigned int* T_Sphere,unsigned int *pointer_n_triangles){
     /////////////////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////      CUDA        ////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////   
@@ -306,17 +421,16 @@ void cudaGenerateSurface(double* Point_Cloud,unsigned int* T,double* Sphere_Clou
     cudaerr=cudaMemcpy(Sphere_Cloud, Sphere_Cloud_dev, sizeof(double) *n_total_points * 3, cudaMemcpyDeviceToHost);
     if (cudaerr != 0)	printf("ERROR copying to SphereCloud. CudaMalloc value=%i\n\r",cudaerr);
     //3rd step. First part of the ODF
-    int temp_blok=64;/////This parameter can be changed
+    int temp_blok=32;/////This parameter can be changed
     unsigned int *OneMesh_dev;
     cudaMalloc((void**)(&OneMesh_dev), sizeof(unsigned int) * n_triangles_perDonut * 3);
     cudaODF_part1<<<n_AZBLK*(n_beams-1)/temp_blok, temp_blok >>> (OneMesh_dev);
     //6th step. last Fill
     //4th step. 2nd part ODF
-    temp_blok=128;/////This parameter can be changed
+    temp_blok=32;/////This parameter can be changed
     bool *flag_array_dev;
     cudaMalloc((void**)(&flag_array_dev), sizeof(bool) * n_triangles_perDonut*(n_donuts-1));
     cudaODF_part2<<<n_triangles_perDonut*(n_donuts-1)/temp_blok, temp_blok >>> (Sphere_Cloud_dev,OneMesh_dev,flag_array_dev);
-    TwoandTri_Donut_Fill(Sphere_Cloud,&T_Sphere[OneDonutFill_triangles*3],&T_Sphere[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_Sphere[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);
     
     bool *flag_array=(bool*)malloc(n_triangles_perDonut*(n_donuts-1) *sizeof(bool));
     cudaerr=cudaMemcpy(T_Sphere,OneMesh_dev, sizeof(unsigned int) *n_triangles_perDonut *3, cudaMemcpyDeviceToHost);
@@ -327,7 +441,9 @@ void cudaGenerateSurface(double* Point_Cloud,unsigned int* T,double* Sphere_Clou
     ///////////////////////////////////      CPU        ////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////
     //5th step. last part ODF
-    cpuODF_part3(T_Sphere,flag_array);
+    //cpuODF_part3(T_Sphere,flag_array);
+    TwoandTri_Donut_Fill(Sphere_Cloud,&T_Sphere[OneDonutFill_triangles*3],&T_Sphere[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_Sphere[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);
+    
     unsigned int temp_vex,n_triangles=0;
     double xp,yp,zp;
     for (unsigned int i = 0; i < n_total_triangles; i++){
@@ -580,7 +696,7 @@ void Generate_surfaceGPU(double* Point_Cloud,unsigned int* T,double* Sphere_Clou
 /******************************************************************/
 /*************************       MAIN     *************************/
 /******************************************************************/
-#define TESTING 1
+#define TESTING 0
 bool malloc_already=false;
 int main()
 {
@@ -639,7 +755,8 @@ int main()
     printf ("/********************CPU y GPU*********************/:\n");
 	startGPU = clock();
     for (int i=0;i<iter;i++){
-        cudaGenerateSurface(Point_Cloud,T_gpu,Sphere_Cloud_gpu,T_Sphere_gpu,&n_triangles_real_data_gpu);
+        //cudaGenerateSurface(Point_Cloud,T_gpu,Sphere_Cloud_gpu,T_Sphere_gpu,&n_triangles_real_data_gpu);
+        cudaGenerateSurface(Point_Cloud,T_gpu,&n_triangles_real_data_gpu);
     }
 	finishGPU = clock();
 	printf("numero de triangulos: %d\n",n_triangles_real_data_gpu);
@@ -843,11 +960,11 @@ int main()
     cudaEventRecord(start_gpu);
     
     for (int z = 0; z < iter; z++){
-        int temp_blok=64;/////This parameter can be changed
+        int temp_blok=32;/////This parameter can be changed
         cudaODF_part1<<<n_AZBLK*(n_beams-1)/temp_blok, temp_blok >>> (OneMesh_dev);
         cudaerr=cudaMemcpy(T_gpu,OneMesh_dev, sizeof(unsigned int) *n_triangles_perDonut *3, cudaMemcpyDeviceToHost);
         if (cudaerr != 0)	printf("ERROR copying to OneMesh, index %d. CudaMalloc value=%i\n\r",z,cudaerr);
-        temp_blok=128;/////This parameter can be changed
+        temp_blok=32;/////This parameter can be changed
         cudaODF_part2<<<n_triangles_perDonut*(n_donuts-1)/temp_blok, temp_blok >>> (Point_Cloud_dev,OneMesh_dev,flag_array_dev);
         cudaerr=cudaMemcpy(flag_array,flag_array_dev, sizeof(bool) *n_triangles_perDonut*(n_donuts-1) , cudaMemcpyDeviceToHost);
         if (cudaerr != 0)	printf("ERROR copying to flag_array, index %d. CudaMalloc value=%i\n\r",z,cudaerr); 

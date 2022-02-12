@@ -14,9 +14,6 @@
 # EXTERNAL cache entries
 ########################
 
-//Build the testing tree.
-BUILD_TESTING:BOOL=ON
-
 //Path to a program.
 CMAKE_ADDR2LINE:FILEPATH=/usr/bin/addr2line
 
@@ -140,7 +137,7 @@ CMAKE_PROJECT_DESCRIPTION:STATIC=
 CMAKE_PROJECT_HOMEPAGE_URL:STATIC=
 
 //Value Computed by CMake
-CMAKE_PROJECT_NAME:STATIC=cmake_and_cuda
+CMAKE_PROJECT_NAME:STATIC=thesis
 
 //Path to a program.
 CMAKE_RANLIB:FILEPATH=/usr/bin/ranlib
@@ -204,42 +201,14 @@ CMAKE_STRIP:FILEPATH=/usr/bin/strip
 // Studio IDE projects all commands are done without /nologo.
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
-//Path to the coverage program that CTest uses for performing coverage
-// inspection
-COVERAGE_COMMAND:FILEPATH=/usr/bin/gcov
-
-//Extra command line flags to pass to the coverage tool
-COVERAGE_EXTRA_FLAGS:STRING=-l
-
-//How many times to retry timed-out CTest submissions.
-CTEST_SUBMIT_RETRY_COUNT:STRING=3
-
-//How long to wait between timed-out CTest submissions.
-CTEST_SUBMIT_RETRY_DELAY:STRING=5
-
-//Maximum time allowed before CTest will kill the test.
-DART_TESTING_TIMEOUT:STRING=1500
-
-//Command to build the project
-MAKECOMMAND:STRING=/usr/bin/cmake --build . --config "${CTEST_CONFIGURATION_TYPE}"
-
-//Path to the memory checking command, used for memory error detection.
-MEMORYCHECK_COMMAND:FILEPATH=/usr/local/cuda-11.6/bin/cuda-memcheck
-
-//File that contains suppressions for the memory checker
-MEMORYCHECK_SUPPRESSIONS_FILE:FILEPATH=
-
-//Name of the computer/site where compile is being run
-SITE:STRING=catolica
+//Value Computed by CMake
+thesis_BINARY_DIR:STATIC=/home/catolica/Documents/Github/Thesis/VisualCode/build
 
 //Value Computed by CMake
-cmake_and_cuda_BINARY_DIR:STATIC=/home/catolica/Documents/Github/Thesis/VisualCode/build
+thesis_IS_TOP_LEVEL:STATIC=ON
 
 //Value Computed by CMake
-cmake_and_cuda_IS_TOP_LEVEL:STATIC=ON
-
-//Value Computed by CMake
-cmake_and_cuda_SOURCE_DIR:STATIC=/home/catolica/Documents/Github/Thesis/VisualCode
+thesis_SOURCE_DIR:STATIC=/home/catolica/Documents/Github/Thesis/VisualCode
 
 
 ########################
@@ -264,8 +233,6 @@ CMAKE_COLOR_MAKEFILE-ADVANCED:INTERNAL=1
 CMAKE_COMMAND:INTERNAL=/usr/bin/cmake
 //Path to cpack program executable.
 CMAKE_CPACK_COMMAND:INTERNAL=/usr/bin/cpack
-//ADVANCED property for variable: CMAKE_CTEST_COMMAND
-CMAKE_CTEST_COMMAND-ADVANCED:INTERNAL=1
 //Path to ctest program executable.
 CMAKE_CTEST_COMMAND:INTERNAL=/usr/bin/ctest
 //ADVANCED property for variable: CMAKE_CUDA_COMPILER
@@ -389,22 +356,4 @@ CMAKE_STRIP-ADVANCED:INTERNAL=1
 CMAKE_UNAME:INTERNAL=/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: COVERAGE_COMMAND
-COVERAGE_COMMAND-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: COVERAGE_EXTRA_FLAGS
-COVERAGE_EXTRA_FLAGS-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CTEST_SUBMIT_RETRY_COUNT
-CTEST_SUBMIT_RETRY_COUNT-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: CTEST_SUBMIT_RETRY_DELAY
-CTEST_SUBMIT_RETRY_DELAY-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: DART_TESTING_TIMEOUT
-DART_TESTING_TIMEOUT-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: MAKECOMMAND
-MAKECOMMAND-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: MEMORYCHECK_COMMAND
-MEMORYCHECK_COMMAND-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: MEMORYCHECK_SUPPRESSIONS_FILE
-MEMORYCHECK_SUPPRESSIONS_FILE-ADVANCED:INTERNAL=1
-//ADVANCED property for variable: SITE
-SITE-ADVANCED:INTERNAL=1
 

@@ -26,7 +26,7 @@ trimesh(T,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))
 %%
 clc;close
 T=[];
-temp=readmatrix("CUDAOneMesh.csv")+1;
+temp=readmatrix("CUDAMesh.csv")+1;
 T=[T;temp];
 Point_Cloud=readmatrix("CUDASphere_cloud.csv");
 trimesh(T,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))

@@ -29,5 +29,5 @@ clc
 T=[];
 temp=readmatrix("CUDAMesh.csv")+1;
 T=[T;temp];
-Point_Cloud=readmatrix("Sphere_cloud.csv");
+Point_Cloud=readmatrix("MinaData.csv");
 trimesh(T,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))

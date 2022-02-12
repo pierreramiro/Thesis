@@ -905,14 +905,18 @@ void TwoandTri_Donut_Fill(double* Point_Cloud,unsigned int* TwoDF,unsigned int* 
  * 
  * \return None
  */
-void Generate_surface(double* Point_Cloud,unsigned int* T,double* Sphere_Cloud,unsigned int *T_Sphere,unsigned int *pointer_n_triangles){
+void Generate_surface(double* Point_Cloud,unsigned int* T,unsigned int *pointer_n_triangles){
+    double *Sphere_Cloud =(double*)malloc(n_total_points * 3 *sizeof(double));
+    unsigned int* T_Sphere=(unsigned int*)malloc(n_total_triangles * 3 *sizeof(unsigned int));
+    unsigned int temp_vex,n_triangles=0;
+    double xp,yp,zp;
+    
     Generate_sphere(Sphere_Cloud);
     Supress_redundant_data(Sphere_Cloud);
     One_Donut_Fill(Sphere_Cloud,T_Sphere);
     TwoandTri_Donut_Fill(Sphere_Cloud,&T_Sphere[OneDonutFill_triangles*3],&T_Sphere[(OneDonutFill_triangles+TwoDonutFill_triangles)*3],&T_Sphere[(OneDonutFill_triangles+TwoDonutFill_triangles+TriDonutFill_triangles)*3]);    
+    
     /*Procedemos a chequear que los vertices son no nulos*/
-    unsigned int temp_vex,n_triangles=0;
-    double xp,yp,zp;
     for (unsigned int i = 0; i < n_total_triangles; i++){
         //Analizamos el punto del vertice v0
         temp_vex=T_Sphere[i*3];
@@ -941,7 +945,19 @@ void Generate_surface(double* Point_Cloud,unsigned int* T,double* Sphere_Cloud,u
             }
         }
     }
-    pointer_n_triangles[0]=n_triangles;    
+    pointer_n_triangles[0]=n_triangles; 
+    for (unsigned int i = 0; i < n_total_points; i++){
+        xp=Sphere_Cloud[i*3+0];
+        yp=Sphere_Cloud[i*3+1];
+        zp=Sphere_Cloud[i*3+2];
+        if ((xp==0)&&(yp==0)&&(zp==0)){
+            Point_Cloud[i*3+0]=0;
+            Point_Cloud[i*3+1]=0;
+            Point_Cloud[i*3+2]=0;
+        }
+    }   
+    free(Sphere_Cloud);
+    free(T_Sphere);
 }
 /*----------------------------------------------------------------------------*/
 #endif /* ouster_reconstruction.h.  */

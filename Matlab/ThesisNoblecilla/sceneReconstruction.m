@@ -282,3 +282,15 @@ for i=length(meshDonut6):-1:1
     end
 end
 %% Aqui realizamos la union de los meshes(FineMesh)
+%El primer mesh no se toca. En cambio, para el segundo mesh hacemos la
+%misma lógica del FineMesh algorithm. 
+%-Primero es ubicar el punto extremo distinto de cero (eso está listo). 
+%-Luego, hallar el punto no nulo de la Donut anterior. 
+%-Luego, hallar el otro vertice revisando la malla triangular respectiva.
+%-Hacer esto mismo, para hallar todos los triángulos pivots.
+%-Luego usar el algortimo de FillZone, el cual debe modificarse, ya que los
+% puntos entre tripivots (freepoints) pueden variar debido al Downsampling
+%-Para el caso de TriDonutFill, establecer bien los puntos de inicio y fin
+ 
+%En teoría, hay que hacer unas breves modificaciones.. pero a primera
+%impresión pareciera que funcionará.

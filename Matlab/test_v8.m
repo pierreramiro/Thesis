@@ -17,7 +17,7 @@ Total_time_start=tic;
 %Mode 1023 azimuth. Every azimuth increments in 88 ticks
     %1 tick = 360/90112= 0.003995°.     Aprox -> 0.004°
     %88 tick = 360*88/90112 = 0.3516°
-    n_AZBLK=1024;
+    n_AZBLK=4096;
     %It should be noted that, we obtain 1024*16 = 16384 points in every LIDAR scan
     n_points=n_AZBLK*n_beams;
     ticks_between_azimuths=total_ticks/n_AZBLK;
@@ -580,8 +580,16 @@ fprintf("\nEl tiempo de ejecución total es de: %.4f segundos\n",Time_sphere_gen
 
 %%
 figure(3)
-temp=[OneDonutFill;TwoDonutFill;TriMiddleFill];
-trimesh(temp,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))
+temp=[OneDonutFill];
+trimesh(temp,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))%,'FaceColor',[249,249,146]/255,'EdgeColor',[41,41,129]/255)
+hold on
+temp=[TwoDonutFill;TriDonutFill;TriMiddleFill];
+trimesh(temp,Point_Cloud(:,1),Point_Cloud(:,2),Point_Cloud(:,3))%,'FaceColor',[249,249,146]/255,'EdgeColor',[41,41,129]/255)
+pbaspect([1 1 1])
+grid off
+set(gcf,'color','w');
+set(gca,'visible','off')
+hold off
 TotalTriangleMesh=temp;
 % %% RECONSTRUCCIÓN MINA
 % tic
